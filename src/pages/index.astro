@@ -1,17 +1,34 @@
 ---
-
+import "../styles/global.css";
+import WeekStrip from "../components/WeekStrip";
 ---
 
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tapos-na — pomodoro calendar</title>
+  </head>
+  <body class="min-h-dvh bg-base-200 text-base-content">
+    <header class="navbar bg-base-100 shadow-sm">
+      <div class="navbar-start">
+        <span class="text-lg font-semibold">tapos-na</span>
+      </div>
+      <div class="navbar-end">
+        <span class="badge badge-soft badge-primary">T1 shell</span>
+      </div>
+    </header>
+    <main class="mx-auto max-w-5xl p-6">
+      <section class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+          <h1 class="card-title">This week</h1>
+          <p class="text-sm opacity-70">
+            Fixed commitments, events, and todos — the pomodoro plan is derived
+            from these inputs, never stored.
+          </p>
+          <WeekStrip client:load />
+        </div>
+      </section>
+    </main>
+  </body>
 </html>
