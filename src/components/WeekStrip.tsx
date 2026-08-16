@@ -1,15 +1,5 @@
 import { For } from "solid-js";
-import { WEEKDAY_NAMES } from "../schema";
-
-const DAY_LABELS: Record<(typeof WEEKDAY_NAMES)[number], string> = {
-  monday: "Mon",
-  tuesday: "Tue",
-  wednesday: "Wed",
-  thursday: "Thu",
-  friday: "Fri",
-  saturday: "Sat",
-  sunday: "Sun",
-};
+import { DAY_LABELS, WEEKDAY_NAMES } from "../schema";
 
 /**
  * Shell island: renders the week's Monday–Sunday strip, hydrated on load.

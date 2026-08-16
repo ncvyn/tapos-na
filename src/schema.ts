@@ -33,6 +33,17 @@ export const WEEKDAY_NAMES = [
 export const DayOfWeek = Schema.Literal(...WEEKDAY_NAMES);
 export type DayOfWeek = typeof DayOfWeek.Type;
 
+/** Short 3-letter labels for day-of-week display. */
+export const DAY_LABELS: Record<DayOfWeek, string> = {
+  monday: "Mon",
+  tuesday: "Tue",
+  wednesday: "Wed",
+  thursday: "Thu",
+  friday: "Fri",
+  saturday: "Sat",
+  sunday: "Sun",
+};
+
 /**
  * Minutes since local midnight, 0..1440 (1440 = the end of the day).
  * Times are wall-clock; the stored IANA timezone + DST-aware rendering map

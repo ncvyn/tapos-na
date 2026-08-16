@@ -1,6 +1,6 @@
 ---
 import "../styles/global.css";
-import WeekStrip from "../components/WeekStrip";
+import DayView from "../components/DayView";
 ---
 
 <html lang="en">
@@ -15,20 +15,11 @@ import WeekStrip from "../components/WeekStrip";
         <span class="text-lg font-semibold">tapos-na</span>
       </div>
       <div class="navbar-end">
-        <span class="badge badge-soft badge-primary">T1 shell</span>
+        <span class="badge badge-soft badge-primary">T2 Day UI</span>
       </div>
     </header>
-    <main class="mx-auto max-w-5xl p-6">
-      <section class="card bg-base-100 shadow-sm">
-        <div class="card-body">
-          <h1 class="card-title">This week</h1>
-          <p class="text-sm opacity-70">
-            Fixed commitments, events, and todos — the pomodoro plan is derived
-            from these inputs, never stored.
-          </p>
-          <WeekStrip client:load />
-        </div>
-      </section>
+    <main class="mx-auto max-w-6xl p-4 sm:p-6">
+      <DayView client:load />
     </main>
   </body>
 </html>
