@@ -1,6 +1,7 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { type DayItem, type DayOfWeek, type Todo } from "../schema";
 import { createCalendarStore } from "../state";
+import ClockBar from "./ClockBar";
 import DayView from "./DayView";
 import ImportModal from "./ImportModal";
 import ItemModal, { type ItemType } from "./ItemModal";
@@ -151,6 +152,9 @@ export default function CalendarApp() {
           </div>
         </div>
       </header>
+
+      {/* Live wall-clock timer bar */}
+      <ClockBar store={store} />
 
       {/* Error banner */}
       <Show when={store.errorMessage()}>

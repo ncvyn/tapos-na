@@ -3,6 +3,7 @@ import {
   formatTimeSpan,
   getDisplayDays,
   getTodayWeekday,
+  getZonedClockTime,
   minutesToTime,
   timeToMinutes,
 } from "./time";
@@ -59,6 +60,26 @@ describe("Timezone & DST seam", () => {
     it("defaults to UTC if timezone is invalid or unresolvable", () => {
       const instant = new Date("2026-08-16T12:00:00Z");
       expect(getTodayWeekday("Invalid/Timezone", instant)).toBe("sunday");
+    });
+  });
+
+  describe("getZonedClockTime", () => {
+    it("formats the wall-clock time in a timezone as 24-hour HH:MM:SS", () => {
+      const instant = new Date("2026-08-16T12:34:56Z");
+      expect(getZonedClockTime("UTC", instant)).toBe("12:34:56");
+      expect(getZonedClockTime("Asia/Manila", instant)).toBe("20:34:56");
+      expect(getZonedClockTime("America/Los_Angeles", instant)).toBe("05:34:56");
+    });
+
+    it("is DST-aware across the fall-back and spring-forward transitions", () => {
+      // Fall-back: 2026-11-01T06:30:00Z is 01:30 EST (after the 2:00 EDT → 1:00 EST jump).
+      expect(getZonedClockTime("America/New_York", new Date("2026-11-01T06:30:00Z"))).toBe("01:30:00");
+      // Spring-forward: 2026-03-08T14:00:00Z is 10:00 EDT (after the 2:00 EST → 3:00 EDT jump).
+      expect(getZonedClockTime("America/New_York", new Date("2026-03-08T14:00:00Z"))).toBe("10:00:00");
+    });
+
+    it("falls back to UTC formatting for an invalid timezone", () => {
+      expect(getZonedClockTime("Invalid/Zone", new Date("2026-08-16T01:02:03Z"))).toBe("01:02:03");
     });
   });
 
