@@ -323,14 +323,24 @@ export default function DayView(props: DayViewProps) {
                   {(seg: ScheduledSegment) => (
                     <Show
                       when={seg._tag === "work"}
-                      fallback={
-                        <div class="flex items-center justify-between rounded bg-base-200/80 px-2.5 py-1 text-xs text-base-content/70 font-mono">
-                          <span>☕ Break</span>
-                          <span>
-                            {minutesToTime(seg.start)} – {minutesToTime(seg.end)}
-                          </span>
-                        </div>
-                      }
+                      fallback={(() => {
+                        const brk = seg as Extract<
+                          ScheduledSegment,
+                          { _tag: "break" }
+                        >;
+                        return (
+                          <div class="flex items-center justify-between rounded bg-base-200/80 px-2.5 py-1 text-xs text-base-content/70 font-mono">
+                            <span>
+                              {brk.breakType === "long"
+                                ? "🌴 Long Break"
+                                : "☕ Short Break"}
+                            </span>
+                            <span>
+                              {minutesToTime(brk.start)} – {minutesToTime(brk.end)}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     >
                       {(() => {
                         const work = seg as Extract<
@@ -339,18 +349,31 @@ export default function DayView(props: DayViewProps) {
                         >;
                         return (
                           <div class="flex items-center justify-between rounded bg-primary/10 border-l-2 border-primary px-2.5 py-1.5 text-xs text-primary-content">
-                            <div class="truncate text-base-content font-medium">
-                              <span class="mr-1">🍅</span>
-                              {work.todoTitle}
+                            <div class="flex items-center gap-1.5 min-w-0 text-base-content font-medium">
+                              <span
+                                class={`badge badge-xs font-bold ${
+                                  PRIORITY_BADGES[work.priority]
+                                }`}
+                              >
+                                {work.priority}
+                              </span>
+                              <span class="truncate">
+                                🍅 {work.todoTitle}
+                              </span>
                               <Show when={work.isMiniFocus}>
-                                <span class="ml-1 badge badge-xs badge-ghost">
+                                <span class="badge badge-xs badge-ghost">
                                   ½
                                 </span>
                               </Show>
                             </div>
-                            <span class="font-mono text-base-content/70 shrink-0 ml-2">
-                              {minutesToTime(work.start)} – {minutesToTime(work.end)}
-                            </span>
+                            <div class="font-mono text-base-content/70 shrink-0 ml-2 text-right">
+                              <span class="text-[10px] opacity-75 mr-1.5">
+                                #{work.pomodoroNumber}
+                              </span>
+                              <span>
+                                {minutesToTime(work.start)} – {minutesToTime(work.end)}
+                              </span>
+                            </div>
                           </div>
                         );
                       })()}

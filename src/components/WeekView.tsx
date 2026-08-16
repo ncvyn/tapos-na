@@ -187,16 +187,26 @@ export default function WeekView(props: WeekViewProps) {
                         >
                           <For each={schedule()?.segments ?? []}>
                             {(seg: ScheduledSegment) => (
-                              <Show
+                              <                              Show
                                 when={seg._tag === "work"}
-                                fallback={
-                                  <div class="rounded bg-base-300/40 px-1.5 py-0.5 text-[10px] text-base-content/60 font-mono flex items-center justify-between">
-                                    <span>☕ Break</span>
-                                    <span>
-                                      {minutesToTime(seg.start)}–{minutesToTime(seg.end)}
-                                    </span>
-                                  </div>
-                                }
+                                fallback={(() => {
+                                   const brk = seg as Extract<
+                                     ScheduledSegment,
+                                     { _tag: "break" }
+                                   >;
+                                   return (
+                                     <div class="rounded bg-base-300/40 px-1.5 py-0.5 text-[10px] text-base-content/60 font-mono flex items-center justify-between">
+                                       <span>
+                                         {brk.breakType === "long"
+                                           ? "🌴 Long Break"
+                                           : "☕ Short Break"}
+                                       </span>
+                                       <span>
+                                         {minutesToTime(brk.start)}–{minutesToTime(brk.end)}
+                                       </span>
+                                     </div>
+                                   );
+                                 })()}
                               >
                                 {(() => {
                                   const work = seg as Extract<
