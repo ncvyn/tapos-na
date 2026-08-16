@@ -1,6 +1,6 @@
 ---
 import "../styles/global.css";
-import DayView from "../components/DayView";
+import CalendarApp from "../components/CalendarApp";
 ---
 
 <html lang="en">
@@ -10,16 +10,6 @@ import DayView from "../components/DayView";
     <title>tapos-na — pomodoro calendar</title>
   </head>
   <body class="min-h-dvh bg-base-200 text-base-content">
-    <header class="navbar bg-base-100 shadow-sm">
-      <div class="navbar-start">
-        <span class="text-lg font-semibold">tapos-na</span>
-      </div>
-      <div class="navbar-end">
-        <span class="badge badge-soft badge-primary">T2 Day UI</span>
-      </div>
-    </header>
-    <main class="mx-auto max-w-6xl p-4 sm:p-6">
-      <DayView client:load />
-    </main>
+    <CalendarApp client:load />
   </body>
 </html>

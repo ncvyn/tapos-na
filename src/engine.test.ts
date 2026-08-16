@@ -90,6 +90,21 @@ describe("Free Spans Computation (getFreeSpans)", () => {
     ]);
   });
 
+  it("excludes one-off sleep items (e.g. afternoon nap) from free spans", () => {
+    const day: Day = {
+      template: { busy: [], sleep: [] },
+      items: [
+        { _tag: "sleep", id: "nap-1", day: "tuesday", start: 780, end: 840 }, // 13:00 - 14:00 nap
+      ],
+    };
+
+    const spans = getFreeSpans(day);
+    expect(spans).toEqual([
+      { start: 0, end: 780 },
+      { start: 840, end: 1440 },
+    ]);
+  });
+
   it("handles night sleep windows that cross midnight (start > end)", () => {
     const day: Day = {
       template: {

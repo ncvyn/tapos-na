@@ -1,377 +1,216 @@
+import { createMemo, For, Show } from "solid-js";
 import {
-  createMemo,
-  createSignal,
-  For,
-  onMount,
-  Show,
-} from "solid-js";
-import {
-  type Busy,
   DAY_LABELS,
+  type DayItem,
   type DayOfWeek,
-  type Priority,
   type Todo,
   WEEKDAY_NAMES,
 } from "../schema";
-import { computeSchedule, type DaySchedule } from "../engine";
-import { createCalendarStore } from "../state";
+import { computeSchedule, type DaySchedule, type ScheduledSegment } from "../engine";
+import type { CalendarStore } from "../state";
+import { formatTimeSpan, getTodayWeekday, minutesToTime } from "../time";
+import { ITEM_ICONS, ITEM_THEMES, PRIORITY_BADGES } from "./itemStyles";
+import type { ItemType } from "./ItemModal";
 
-const PRIORITY_BADGES: Record<Priority, string> = {
-  P0: "badge-error",
-  P1: "badge-warning",
-  P2: "badge-primary",
-  P3: "badge-info",
-  P4: "badge-ghost",
-};
-
-function minutesToTime(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+interface DayViewProps {
+  store: CalendarStore;
+  onOpenAddItem?: (day: DayOfWeek, defaultType?: ItemType) => void;
+  onOpenEditItem?: (item: DayItem | Todo) => void;
 }
 
-function timeToMinutes(timeStr: string): number {
-  const [hStr, mStr] = timeStr.split(":");
-  const h = parseInt(hStr, 10) || 0;
-  const m = parseInt(mStr, 10) || 0;
-  return Math.min(1440, Math.max(0, h * 60 + m));
-}
-
-export default function DayView() {
-  const store = createCalendarStore();
-
-  onMount(() => {
-    void store.load();
+export default function DayView(props: DayViewProps) {
+  const todayWeekday = createMemo(() => {
+    return getTodayWeekday(props.store.doc.settings.timezone);
   });
 
-  // Active form state for adding / editing Busy Block
-  const [busyModalOpen, setBusyModalOpen] = createSignal(false);
-  const [editingBusyId, setEditingBusyId] = createSignal<string | null>(null);
-  const [busyTitle, setBusyTitle] = createSignal("");
-  const [busyStart, setBusyStart] = createSignal("09:00");
-  const [busyEnd, setBusyEnd] = createSignal("10:00");
-  const [busyFormError, setBusyFormError] = createSignal<string | null>(null);
-
-  // Active form state for adding / editing Todo
-  const [todoModalOpen, setTodoModalOpen] = createSignal(false);
-  const [editingTodoId, setEditingTodoId] = createSignal<string | null>(null);
-  const [todoTitle, setTodoTitle] = createSignal("");
-  const [todoPomodoros, setTodoPomodoros] = createSignal(2);
-  const [todoPriority, setTodoPriority] = createSignal<Priority>("P1");
-  const [todoDueDate, setTodoDueDate] = createSignal<DayOfWeek | "">("");
-  const [todoFormError, setTodoFormError] = createSignal<string | null>(null);
-
-  // Import modal state
-  const [importModalOpen, setImportModalOpen] = createSignal(false);
-  const [importJsonText, setImportJsonText] = createSignal("");
-  const [importError, setImportError] = createSignal<string | null>(null);
-
-  // Derived schedule for selected day (cascades across the full week)
   const derivedSchedule = createMemo<DaySchedule | null>(() => {
-    if (!store.isLoaded()) return null;
-    const weekSchedule = computeSchedule(store.doc);
-    return weekSchedule[store.selectedDay()];
+    if (!props.store.isLoaded()) return null;
+    const weekSchedule = computeSchedule(props.store.doc);
+    return weekSchedule[props.store.selectedDay()];
   });
 
-  // Busy block handlers
-  const openAddBusyModal = () => {
-    setEditingBusyId(null);
-    setBusyTitle("");
-    setBusyStart("09:00");
-    setBusyEnd("10:00");
-    setBusyFormError(null);
-    setBusyModalOpen(true);
-  };
-
-  const openEditBusyModal = (busy: Busy) => {
-    setEditingBusyId(busy.id);
-    setBusyTitle(busy.title);
-    setBusyStart(minutesToTime(busy.start));
-    setBusyEnd(minutesToTime(busy.end));
-    setBusyFormError(null);
-    setBusyModalOpen(true);
-  };
-
-  const handleSaveBusy = (e: SubmitEvent) => {
-    e.preventDefault();
-    const title = busyTitle().trim();
-    if (!title) {
-      setBusyFormError("Title is required");
-      return;
-    }
-    const startMin = timeToMinutes(busyStart());
-    const endMin = timeToMinutes(busyEnd());
-    if (endMin <= startMin) {
-      setBusyFormError("End time must be after start time");
-      return;
-    }
-
-    const currentDay = store.selectedDay();
-    const editId = editingBusyId();
-
-    if (editId) {
-      const updated: Busy = {
-        _tag: "busy",
-        id: editId,
-        title,
-        day: currentDay,
-        start: startMin,
-        end: endMin,
-      };
-      store.updateBusy(currentDay, updated);
-    } else {
-      const newBusy: Busy = {
-        _tag: "busy",
-        id: crypto.randomUUID(),
-        title,
-        day: currentDay,
-        start: startMin,
-        end: endMin,
-      };
-      store.addBusy(currentDay, newBusy);
-    }
-    setBusyModalOpen(false);
-  };
-
-  // Todo handlers
-  const openAddTodoModal = () => {
-    setEditingTodoId(null);
-    setTodoTitle("");
-    setTodoPomodoros(2);
-    setTodoPriority("P1");
-    setTodoDueDate("");
-    setTodoFormError(null);
-    setTodoModalOpen(true);
-  };
-
-  const openEditTodoModal = (todo: Todo) => {
-    setEditingTodoId(todo.id);
-    setTodoTitle(todo.title);
-    setTodoPomodoros(todo.pomodoros);
-    setTodoPriority(todo.priority);
-    setTodoDueDate(todo.dueDate ?? "");
-    setTodoFormError(null);
-    setTodoModalOpen(true);
-  };
-
-  const handleSaveTodo = (e: SubmitEvent) => {
-    e.preventDefault();
-    const title = todoTitle().trim();
-    if (!title) {
-      setTodoFormError("Title is required");
-      return;
-    }
-    const pomodoros = Number(todoPomodoros());
-    if (!pomodoros || pomodoros < 1) {
-      setTodoFormError("Pomodoro count must be at least 1");
-      return;
-    }
-
-    const editId = editingTodoId();
-    const due = todoDueDate() === "" ? undefined : todoDueDate() as DayOfWeek;
-
-    if (editId) {
-      const updated: Todo = {
-        _tag: "todo",
-        id: editId,
-        title,
-        pomodoros,
-        priority: todoPriority(),
-        dueDate: due,
-      };
-      store.updateTodo(updated);
-    } else {
-      const newTodo: Todo = {
-        _tag: "todo",
-        id: crypto.randomUUID(),
-        title,
-        pomodoros,
-        priority: todoPriority(),
-        dueDate: due,
-      };
-      store.addTodo(newTodo);
-    }
-    setTodoModalOpen(false);
-  };
-
-  // Export / Import handlers
-  const handleExport = async () => {
-    const json = await store.exportJson();
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "tapos-na-calendar.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleOpenImport = () => {
-    setImportJsonText("");
-    setImportError(null);
-    setImportModalOpen(true);
-  };
-
-  const handleFileUpload = (e: Event) => {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setImportJsonText(reader.result);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const handlePerformImport = async (e: SubmitEvent) => {
-    e.preventDefault();
-    const text = importJsonText().trim();
-    if (!text) {
-      setImportError("Please provide JSON content to import.");
-      return;
-    }
-    const result = await store.importJson(text);
-    if (result.success) {
-      setImportModalOpen(false);
-    } else {
-      setImportError(result.error ?? "Failed to import JSON");
-    }
-  };
-
-  const dayBusyItems = createMemo(() => {
-    const day = store.selectedDay();
-    const items = store.doc.days[day]?.items ?? [];
-    return items.filter((item): item is Busy => item._tag === "busy");
+  const selectedDayItems = createMemo(() => {
+    const day = props.store.selectedDay();
+    const items = props.store.doc.days[day]?.items ?? [];
+    return [...items].sort((a, b) => a.start - b.start);
   });
 
   return (
     <div class="space-y-6">
-      {/* Top action bar: Week day tabs, Status indicator, Import/Export */}
-      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-base-300 pb-4">
-        {/* Day Selector */}
-        <div class="flex flex-wrap gap-1" role="tablist" aria-label="Day selection">
+      {/* Day Selector Tabs */}
+      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-base-300 pb-3">
+        <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Day selection">
           <For each={WEEKDAY_NAMES}>
-            {(day) => (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={store.selectedDay() === day}
-                class={`btn btn-sm ${
-                  store.selectedDay() === day ? "btn-primary" : "btn-ghost"
-                }`}
-                onClick={() => store.setSelectedDay(day)}
-              >
-                {DAY_LABELS[day]}
-              </button>
-            )}
+            {(day) => {
+              const isToday = () => todayWeekday() === day;
+              const isSelected = () => props.store.selectedDay() === day;
+              return (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected()}
+                  class={`btn btn-sm gap-1.5 ${
+                    isSelected() ? "btn-primary" : "btn-ghost"
+                  }`}
+                  onClick={() => props.store.setSelectedDay(day)}
+                >
+                  <span class="capitalize">{DAY_LABELS[day]}</span>
+                  <Show when={isToday()}>
+                    <span class="badge badge-xs badge-accent uppercase font-bold text-[9px]">
+                      Today
+                    </span>
+                  </Show>
+                </button>
+              );
+            }}
           </For>
         </div>
 
-        {/* Persistence Status & Export/Import */}
+        {/* Quick Add buttons */}
         <div class="flex items-center gap-2">
-          <Show when={store.status() === "saving"}>
-            <span class="text-xs text-base-content/70">Saving...</span>
-          </Show>
-          <Show when={store.status() === "saved"}>
-            <span class="badge badge-xs badge-success">Saved</span>
-          </Show>
-          <Show when={store.errorMessage()}>
-            <div class="badge badge-sm badge-error gap-1">
-              <span>{store.errorMessage()}</span>
-              <button
-                type="button"
-                class="btn btn-ghost btn-xs"
-                onClick={store.clearError}
-              >
-                ×
-              </button>
-            </div>
-          </Show>
           <button
             type="button"
             class="btn btn-sm btn-outline"
-            onClick={handleExport}
-            title="Export current calendar as JSON"
+            onClick={() =>
+              props.onOpenAddItem?.(props.store.selectedDay(), "busy")
+            }
           >
-            Export
+            + Add Commitment
           </button>
           <button
             type="button"
-            class="btn btn-sm btn-outline"
-            onClick={handleOpenImport}
-            title="Import calendar from JSON"
+            class="btn btn-sm btn-primary"
+            onClick={() =>
+              props.onOpenAddItem?.(props.store.selectedDay(), "todo")
+            }
           >
-            Import
+            + Add Todo
           </button>
         </div>
       </div>
 
-      {/* Main content grid: Busy blocks + Todos + Derived schedule preview */}
+      {/* Main Grid: Fixed Commitments + Todos + Derived Plan */}
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Column 1: Busy Blocks for Selected Day (5 cols) */}
-        <div class="card bg-base-100 shadow-sm lg:col-span-4">
+        {/* Column 1: Fixed Commitments, Events & Sleep for Selected Day (4 cols) */}
+        <div class="card bg-base-100 shadow-sm border border-base-300 lg:col-span-4">
           <div class="card-body p-4">
             <div class="flex items-center justify-between">
-              <h2 class="card-title text-base font-bold capitalize">
-                {store.selectedDay()} Busy Blocks
-              </h2>
-              <button
-                type="button"
-                class="btn btn-primary btn-xs"
-                onClick={openAddBusyModal}
-              >
-                + Add Busy
-              </button>
+              <div>
+                <h2 class="card-title text-base font-bold capitalize">
+                  {props.store.selectedDay()} Commitments
+                </h2>
+                <p class="text-xs text-base-content/60">
+                  Fixed blocks (events, busy, sleep). Gaps become available.
+                </p>
+              </div>
+              <div class="dropdown dropdown-end">
+                <div
+                  tabIndex={0}
+                  role="button"
+                  class="btn btn-ghost btn-xs btn-circle"
+                  title="Add item"
+                >
+                  +
+                </div>
+                <ul
+                  tabIndex={0}
+                  class="dropdown-content menu z-1 bg-base-200 rounded-box w-36 p-2 shadow-lg text-xs"
+                >
+                  <li>
+                    <a
+                      onClick={() =>
+                        props.onOpenAddItem?.(
+                          props.store.selectedDay(),
+                          "busy",
+                        )
+                      }
+                    >
+                      💼 Busy Block
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      onClick={() =>
+                        props.onOpenAddItem?.(
+                          props.store.selectedDay(),
+                          "event",
+                        )
+                      }
+                    >
+                      🗓️ Event
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      onClick={() =>
+                        props.onOpenAddItem?.(
+                          props.store.selectedDay(),
+                          "sleep",
+                        )
+                      }
+                    >
+                      🌙 Sleep Window
+                    </a>
+                  </li>
+                </ul>
+              </div>
             </div>
-            <p class="text-xs text-base-content/70">
-              Fixed commitments (classes, work shifts). Gaps become available for
-              pomodoros.
-            </p>
 
-            <div class="mt-3 divide-y divide-base-200">
+            <div class="mt-3 space-y-2">
               <Show
-                when={dayBusyItems().length > 0}
+                when={selectedDayItems().length > 0}
                 fallback={
-                  <div class="py-6 text-center text-xs text-base-content/50">
-                    No busy blocks on {store.selectedDay()}.
+                  <div class="py-8 text-center text-xs text-base-content/40 italic">
+                    No fixed commitments on {props.store.selectedDay()}.
                   </div>
                 }
               >
-                <For each={dayBusyItems()}>
-                  {(busy) => (
-                    <div class="flex items-center justify-between py-2">
-                      <div class="min-w-0 pr-2">
-                        <div class="truncate text-sm font-medium">
-                          {busy.title}
+                <For each={selectedDayItems()}>
+                  {(item) => {
+                    const theme = ITEM_THEMES[item._tag];
+                    return (
+                      <div
+                        class={`rounded-lg p-2.5 border transition-all flex items-center justify-between ${theme.card}`}
+                      >
+                        <div class="min-w-0 pr-2">
+                          <div class="flex items-center gap-1.5 truncate text-sm font-medium">
+                            <span>{ITEM_ICONS[item._tag]}</span>
+                            <span class="truncate">
+                              {item._tag === "sleep" ? theme.name : item.title}
+                            </span>
+                            <span class="badge badge-xs badge-outline opacity-70 uppercase text-[9px]">
+                              {item._tag}
+                            </span>
+                          </div>
+                          <div class="text-xs opacity-80 font-mono mt-0.5">
+                            {formatTimeSpan(item.start, item.end)}
+                          </div>
                         </div>
-                        <div class="text-xs text-base-content/70 font-mono">
-                          {minutesToTime(busy.start)} – {minutesToTime(busy.end)} ({busy.end - busy.start}m)
+
+                        <div class="flex gap-1 shrink-0">
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-xs"
+                            onClick={() => props.onOpenEditItem?.(item)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-xs text-error"
+                            onClick={() =>
+                              props.store.deleteDayItem(
+                                props.store.selectedDay(),
+                                item.id,
+                              )
+                            }
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
-                      <div class="flex gap-1 shrink-0">
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-xs"
-                          onClick={() => openEditBusyModal(busy)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-xs text-error"
-                          onClick={() =>
-                            store.deleteBusy(store.selectedDay(), busy.id)
-                          }
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  }}
                 </For>
               </Show>
             </div>
@@ -379,38 +218,42 @@ export default function DayView() {
         </div>
 
         {/* Column 2: Todos (Week-Scoped) (4 cols) */}
-        <div class="card bg-base-100 shadow-sm lg:col-span-4">
+        <div class="card bg-base-100 shadow-sm border border-base-300 lg:col-span-4">
           <div class="card-body p-4">
             <div class="flex items-center justify-between">
-              <h2 class="card-title text-base font-bold">Todos</h2>
+              <div>
+                <h2 class="card-title text-base font-bold">Week Todos</h2>
+                <p class="text-xs text-base-content/60">
+                  Sized by pomodoros, placed in priority order (P0 first).
+                </p>
+              </div>
               <button
                 type="button"
                 class="btn btn-primary btn-xs"
-                onClick={openAddTodoModal}
+                onClick={() =>
+                  props.onOpenAddItem?.(props.store.selectedDay(), "todo")
+                }
               >
                 + Add Todo
               </button>
             </div>
-            <p class="text-xs text-base-content/70">
-              Work sized by pomodoros and scheduled in priority order (P0 first).
-            </p>
 
             <div class="mt-3 divide-y divide-base-200">
               <Show
-                when={store.doc.todos.length > 0}
+                when={props.store.doc.todos.length > 0}
                 fallback={
-                  <div class="py-6 text-center text-xs text-base-content/50">
-                    No todos yet. Add one to generate pomodoro bands!
+                  <div class="py-8 text-center text-xs text-base-content/40 italic">
+                    No todos yet. Add one to generate pomodoro schedule!
                   </div>
                 }
               >
-                <For each={store.doc.todos}>
+                <For each={props.store.doc.todos}>
                   {(todo) => (
-                    <div class="flex items-center justify-between py-2">
+                    <div class="flex items-center justify-between py-2.5">
                       <div class="min-w-0 pr-2">
                         <div class="flex items-center gap-1.5 truncate">
                           <span
-                            class={`badge badge-xs ${
+                            class={`badge badge-xs font-bold ${
                               PRIORITY_BADGES[todo.priority]
                             }`}
                           >
@@ -420,11 +263,12 @@ export default function DayView() {
                             {todo.title}
                           </span>
                         </div>
-                        <div class="text-xs text-base-content/70">
-                          {todo.pomodoros} {todo.pomodoros === 1 ? "pomodoro" : "pomodoros"}
+                        <div class="text-xs text-base-content/70 mt-0.5">
+                          {todo.pomodoros}{" "}
+                          {todo.pomodoros === 1 ? "pomodoro" : "pomodoros"}
                           <Show when={todo.dueDate}>
-                            <span class="ml-1 opacity-70">
-                              · Due {DAY_LABELS[todo.dueDate!]}
+                            <span class="ml-1 badge badge-outline badge-xs capitalize">
+                              Due {DAY_LABELS[todo.dueDate!]}
                             </span>
                           </Show>
                         </div>
@@ -433,14 +277,14 @@ export default function DayView() {
                         <button
                           type="button"
                           class="btn btn-ghost btn-xs"
-                          onClick={() => openEditTodoModal(todo)}
+                          onClick={() => props.onOpenEditItem?.(todo)}
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           class="btn btn-ghost btn-xs text-error"
-                          onClick={() => store.deleteTodo(todo.id)}
+                          onClick={() => props.store.deleteTodo(todo.id)}
                         >
                           Delete
                         </button>
@@ -454,13 +298,13 @@ export default function DayView() {
         </div>
 
         {/* Column 3: Derived Pomodoro Schedule for Selected Day (4 cols) */}
-        <div class="card bg-base-100 shadow-sm lg:col-span-4">
+        <div class="card bg-base-100 shadow-sm border border-base-300 lg:col-span-4">
           <div class="card-body p-4">
             <h2 class="card-title text-base font-bold capitalize">
-              {store.selectedDay()} Derived Plan
+              {props.store.selectedDay()} Derived Plan
             </h2>
-            <p class="text-xs text-base-content/70">
-              Auto-derived schedule in free gaps. Never stored or dragged.
+            <p class="text-xs text-base-content/60">
+              Derived automatically into free gaps. Never stored or dragged.
             </p>
 
             <div class="mt-3 space-y-1.5">
@@ -470,33 +314,38 @@ export default function DayView() {
                   derivedSchedule()!.segments.length > 0
                 }
                 fallback={
-                  <div class="py-6 text-center text-xs text-base-content/50">
-                    No scheduled segments for this day.
+                  <div class="py-8 text-center text-xs text-base-content/40 italic">
+                    No pomodoro segments scheduled for this day.
                   </div>
                 }
               >
                 <For each={derivedSchedule()?.segments ?? []}>
-                  {(seg) => (
+                  {(seg: ScheduledSegment) => (
                     <Show
                       when={seg._tag === "work"}
                       fallback={
-                        <div class="flex items-center justify-between rounded bg-base-200/60 px-2.5 py-1 text-xs text-base-content/60">
+                        <div class="flex items-center justify-between rounded bg-base-200/80 px-2.5 py-1 text-xs text-base-content/70 font-mono">
                           <span>☕ Break</span>
-                          <span class="font-mono">
+                          <span>
                             {minutesToTime(seg.start)} – {minutesToTime(seg.end)}
                           </span>
                         </div>
                       }
                     >
                       {(() => {
-                        const work = seg as Extract<typeof seg, { _tag: "work" }>;
+                        const work = seg as Extract<
+                          ScheduledSegment,
+                          { _tag: "work" }
+                        >;
                         return (
                           <div class="flex items-center justify-between rounded bg-primary/10 border-l-2 border-primary px-2.5 py-1.5 text-xs text-primary-content">
                             <div class="truncate text-base-content font-medium">
                               <span class="mr-1">🍅</span>
                               {work.todoTitle}
                               <Show when={work.isMiniFocus}>
-                                <span class="ml-1 badge badge-xs badge-ghost">½</span>
+                                <span class="ml-1 badge badge-xs badge-ghost">
+                                  ½
+                                </span>
                               </Show>
                             </div>
                             <span class="font-mono text-base-content/70 shrink-0 ml-2">
@@ -513,252 +362,6 @@ export default function DayView() {
           </div>
         </div>
       </div>
-
-      {/* Busy Modal */}
-      <Show when={busyModalOpen()}>
-        <div class="modal modal-open" role="dialog" aria-modal="true">
-          <div class="modal-box">
-            <h3 class="font-bold text-lg">
-              {editingBusyId() ? "Edit Busy Block" : "Add Busy Block"}
-            </h3>
-            <p class="text-xs text-base-content/70 capitalize">
-              For {store.selectedDay()}
-            </p>
-
-            <form onSubmit={handleSaveBusy} class="mt-4 space-y-4">
-              <Show when={busyFormError()}>
-                <div class="alert alert-error text-xs py-2">
-                  <span>{busyFormError()}</span>
-                </div>
-              </Show>
-
-              <div class="form-control">
-                <label class="label">
-                  <span class="label-text">Title</span>
-                </label>
-                <input
-                  type="text"
-                  class="input input-bordered w-full"
-                  placeholder="e.g. CS101 Lecture, Shift"
-                  value={busyTitle()}
-                  onInput={(e) => setBusyTitle(e.currentTarget.value)}
-                  required
-                  autofocus
-                />
-              </div>
-
-              <div class="grid grid-cols-2 gap-3">
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text">Start Time</span>
-                  </label>
-                  <input
-                    type="time"
-                    class="input input-bordered w-full"
-                    value={busyStart()}
-                    onInput={(e) => setBusyStart(e.currentTarget.value)}
-                    required
-                  />
-                </div>
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text">End Time</span>
-                  </label>
-                  <input
-                    type="time"
-                    class="input input-bordered w-full"
-                    value={busyEnd()}
-                    onInput={(e) => setBusyEnd(e.currentTarget.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div class="modal-action">
-                <button
-                  type="button"
-                  class="btn btn-ghost"
-                  onClick={() => setBusyModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" class="btn btn-primary">
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </Show>
-
-      {/* Todo Modal */}
-      <Show when={todoModalOpen()}>
-        <div class="modal modal-open" role="dialog" aria-modal="true">
-          <div class="modal-box">
-            <h3 class="font-bold text-lg">
-              {editingTodoId() ? "Edit Todo" : "Add Todo"}
-            </h3>
-
-            <form onSubmit={handleSaveTodo} class="mt-4 space-y-4">
-              <Show when={todoFormError()}>
-                <div class="alert alert-error text-xs py-2">
-                  <span>{todoFormError()}</span>
-                </div>
-              </Show>
-
-              <div class="form-control">
-                <label class="label">
-                  <span class="label-text">Title</span>
-                </label>
-                <input
-                  type="text"
-                  class="input input-bordered w-full"
-                  placeholder="e.g. Read Chapter 4, Submit Lab"
-                  value={todoTitle()}
-                  onInput={(e) => setTodoTitle(e.currentTarget.value)}
-                  required
-                  autofocus
-                />
-              </div>
-
-              <div class="grid grid-cols-3 gap-3">
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text">Pomodoros</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    class="input input-bordered w-full"
-                    value={todoPomodoros()}
-                    onInput={(e) =>
-                      setTodoPomodoros(parseInt(e.currentTarget.value, 10) || 1)
-                    }
-                    required
-                  />
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text">Priority</span>
-                  </label>
-                  <select
-                    class="select select-bordered w-full"
-                    value={todoPriority()}
-                    onChange={(e) =>
-                      setTodoPriority(e.currentTarget.value as Priority)
-                    }
-                  >
-                    <option value="P0">P0 (Critical)</option>
-                    <option value="P1">P1 (High)</option>
-                    <option value="P2">P2 (Medium)</option>
-                    <option value="P3">P3 (Low)</option>
-                    <option value="P4">P4 (Lowest)</option>
-                  </select>
-                </div>
-
-                <div class="form-control">
-                  <label class="label">
-                    <span class="label-text">Due Date</span>
-                  </label>
-                  <select
-                    class="select select-bordered w-full"
-                    value={todoDueDate()}
-                    onChange={(e) =>
-                      setTodoDueDate(
-                        e.currentTarget.value === ""
-                          ? ""
-                          : (e.currentTarget.value as DayOfWeek),
-                      )
-                    }
-                  >
-                    <option value="">None</option>
-                    <For each={WEEKDAY_NAMES}>
-                      {(day) => (
-                        <option value={day} class="capitalize">
-                          {day}
-                        </option>
-                      )}
-                    </For>
-                  </select>
-                </div>
-              </div>
-
-              <div class="modal-action">
-                <button
-                  type="button"
-                  class="btn btn-ghost"
-                  onClick={() => setTodoModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" class="btn btn-primary">
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </Show>
-
-      {/* Import Modal */}
-      <Show when={importModalOpen()}>
-        <div class="modal modal-open" role="dialog" aria-modal="true">
-          <div class="modal-box max-w-xl">
-            <h3 class="font-bold text-lg">Import Calendar JSON</h3>
-            <p class="text-xs text-base-content/70">
-              Restore your calendar doc from JSON. Invalid or corrupt input is
-              rejected safely without modifying existing state.
-            </p>
-
-            <form onSubmit={handlePerformImport} class="mt-4 space-y-4">
-              <Show when={importError()}>
-                <div class="alert alert-error text-xs py-2">
-                  <span>{importError()}</span>
-                </div>
-              </Show>
-
-              <div class="form-control">
-                <label class="label">
-                  <span class="label-text">Upload JSON File</span>
-                </label>
-                <input
-                  type="file"
-                  accept=".json,application/json"
-                  class="file-input file-input-bordered w-full text-xs"
-                  onChange={handleFileUpload}
-                />
-              </div>
-
-              <div class="form-control">
-                <label class="label">
-                  <span class="label-text">Or Paste JSON</span>
-                </label>
-                <textarea
-                  class="textarea textarea-bordered h-36 font-mono text-xs w-full"
-                  placeholder='{"version": 1, ...}'
-                  value={importJsonText()}
-                  onInput={(e) => setImportJsonText(e.currentTarget.value)}
-                />
-              </div>
-
-              <div class="modal-action">
-                <button
-                  type="button"
-                  class="btn btn-ghost"
-                  onClick={() => setImportModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" class="btn btn-primary">
-                  Import & Restore
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </Show>
     </div>
   );
 }
