@@ -33,6 +33,27 @@ export interface FreeSpan {
   end: number;
 }
 
+/**
+ * Where an effective block came from. `template` = recurring weekly template;
+ * `one-off` = a day-pinned item; `override` = a one-off sleep override that
+ * replaces that day's template sleep.
+ */
+export type BlockSource = "template" | "one-off" | "override";
+
+/**
+ * An effective occupying block on a day, after template expansion. Combines
+ * the recurring template (busy + sleep), one-off items, and any sleep
+ * override so the engine and UI share one view of "what occupies this day".
+ */
+export interface EffectiveBlock {
+  _tag: "busy" | "event" | "sleep";
+  id: string;
+  title?: string;
+  start: number;
+  end: number;
+  source: BlockSource;
+}
+
 /** Work segment scheduled for a todo. */
 export interface WorkSegment {
   _tag: "work";
@@ -96,10 +117,88 @@ export function comparePriority(a: Priority, b: Priority): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Compute free time spans for a day [0, 1440] by subtracting sleep, busy,
- * and event blocks.
+ * Expand a day into its effective occupying blocks: template busy blocks and
+ * template sleep windows (or, when a sleep override is present, the override
+ * blocks instead), plus the day's one-off items. Deterministic and pure —
+ * this is the template→week expansion that feeds both the engine and the UI.
  *
- * - Sleep override (if present) replaces template sleep for that day.
+ * Block order: template busy, one-off items (in stored order), then sleep
+ * (override blocks if set, otherwise template sleep).
+ */
+export function expandDay(day: Day): EffectiveBlock[] {
+  const blocks: EffectiveBlock[] = [];
+
+  for (const block of day.template.busy) {
+    blocks.push({
+      _tag: "busy",
+      id: block.id,
+      title: block.title,
+      start: block.start,
+      end: block.end,
+      source: "template",
+    });
+  }
+
+  for (const item of day.items) {
+    if (item._tag === "busy") {
+      blocks.push({
+        _tag: "busy",
+        id: item.id,
+        title: item.title,
+        start: item.start,
+        end: item.end,
+        source: "one-off",
+      });
+    } else if (item._tag === "event") {
+      blocks.push({
+        _tag: "event",
+        id: item.id,
+        title: item.title,
+        start: item.start,
+        end: item.end,
+        source: "one-off",
+      });
+    } else {
+      blocks.push({
+        _tag: "sleep",
+        id: item.id,
+        start: item.start,
+        end: item.end,
+        source: "one-off",
+      });
+    }
+  }
+
+  if (day.sleepOverride !== undefined) {
+    day.sleepOverride.forEach((block, index) => {
+      blocks.push({
+        _tag: "sleep",
+        id: `override-${index}-${block.start}-${block.end}`,
+        start: block.start,
+        end: block.end,
+        source: "override",
+      });
+    });
+  } else {
+    for (const block of day.template.sleep) {
+      blocks.push({
+        _tag: "sleep",
+        id: block.id,
+        start: block.start,
+        end: block.end,
+        source: "template",
+      });
+    }
+  }
+
+  return blocks;
+}
+
+/**
+ * Compute free time spans for a day [0, 1440] by subtracting the effective
+ * occupying blocks from `expandDay` (template busy/sleep, one-off items, and
+ * any sleep override).
+ *
  * - Sleep spans crossing midnight (start > end) cover [start, 1440] and [0, end].
  * - Busy and event blocks block out their [start, end] intervals.
  * - Overlapping/adjacent occupied blocks are merged before inverting.
@@ -107,23 +206,8 @@ export function comparePriority(a: Priority, b: Priority): number {
 export function getFreeSpans(day: Day): FreeSpan[] {
   const occupied: Array<{ start: number; end: number }> = [];
 
-  // 1. Sleep blocks: sleepOverride replaces template.sleep if defined
-  const sleepBlocks =
-    day.sleepOverride !== undefined ? day.sleepOverride : day.template.sleep;
-  for (const block of sleepBlocks) {
-    addOccupiedSpan(occupied, block.start, block.end, true);
-  }
-  for (const item of day.items) {
-    if (item._tag === "sleep") {
-      addOccupiedSpan(occupied, item.start, item.end, true);
-    } else if (item._tag === "busy" || item._tag === "event") {
-      addOccupiedSpan(occupied, item.start, item.end, false);
-    }
-  }
-
-  // 2. Template Busy blocks
-  for (const block of day.template.busy) {
-    addOccupiedSpan(occupied, block.start, block.end, false);
+  for (const block of expandDay(day)) {
+    addOccupiedSpan(occupied, block.start, block.end, block._tag === "sleep");
   }
 
   // Clamp to [0, 1440] and filter non-positive spans

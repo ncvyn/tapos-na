@@ -5,6 +5,7 @@ import DayView from "./DayView";
 import ImportModal from "./ImportModal";
 import ItemModal, { type ItemType } from "./ItemModal";
 import SettingsModal from "./SettingsModal";
+import TemplateModal from "./TemplateModal";
 import WeekView from "./WeekView";
 
 export default function CalendarApp() {
@@ -22,6 +23,14 @@ export default function CalendarApp() {
 
   const [settingsModalOpen, setSettingsModalOpen] = createSignal(false);
   const [importModalOpen, setImportModalOpen] = createSignal(false);
+
+  const [templateModalOpen, setTemplateModalOpen] = createSignal(false);
+  const [templateModalDay, setTemplateModalDay] = createSignal<DayOfWeek>("monday");
+
+  const handleOpenTemplate = (day: DayOfWeek) => {
+    setTemplateModalDay(day);
+    setTemplateModalOpen(true);
+  };
 
   const handleOpenAddItem = (day?: DayOfWeek, defaultType?: ItemType) => {
     setItemToEdit(null);
@@ -172,6 +181,7 @@ export default function CalendarApp() {
               store={store}
               onOpenAddItem={(day) => handleOpenAddItem(day)}
               onOpenEditItem={handleOpenEditItem}
+              onOpenTemplate={handleOpenTemplate}
             />
           </Show>
 
@@ -180,6 +190,7 @@ export default function CalendarApp() {
               store={store}
               onOpenAddItem={(day, type) => handleOpenAddItem(day, type)}
               onOpenEditItem={handleOpenEditItem}
+              onOpenTemplate={handleOpenTemplate}
             />
           </Show>
         </Show>
@@ -205,6 +216,13 @@ export default function CalendarApp() {
         isOpen={importModalOpen()}
         onClose={() => setImportModalOpen(false)}
         store={store}
+      />
+
+      <TemplateModal
+        isOpen={templateModalOpen()}
+        onClose={() => setTemplateModalOpen(false)}
+        store={store}
+        defaultDay={templateModalDay()}
       />
     </div>
   );

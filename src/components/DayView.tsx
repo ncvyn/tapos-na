@@ -6,7 +6,12 @@ import {
   type Todo,
   WEEKDAY_NAMES,
 } from "../schema";
-import { computeSchedule, type DaySchedule, type ScheduledSegment } from "../engine";
+import {
+  computeSchedule,
+  expandDay,
+  type DaySchedule,
+  type ScheduledSegment,
+} from "../engine";
 import type { CalendarStore } from "../state";
 import { formatTimeSpan, getTodayWeekday, minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES, PRIORITY_BADGES } from "./itemStyles";
@@ -16,6 +21,7 @@ interface DayViewProps {
   store: CalendarStore;
   onOpenAddItem?: (day: DayOfWeek, defaultType?: ItemType) => void;
   onOpenEditItem?: (item: DayItem | Todo) => void;
+  onOpenTemplate?: (day: DayOfWeek) => void;
 }
 
 export default function DayView(props: DayViewProps) {
@@ -34,6 +40,15 @@ export default function DayView(props: DayViewProps) {
     const items = props.store.doc.days[day]?.items ?? [];
     return [...items].sort((a, b) => a.start - b.start);
   });
+
+  const recurringBlocks = createMemo(() => {
+    const day = props.store.selectedDay();
+    const dayData = props.store.doc.days[day];
+    if (!dayData) return [];
+    return expandDay(dayData).filter((b) => b.source !== "one-off");
+  });
+
+  const hasRecurring = createMemo(() => recurringBlocks().length > 0);
 
   return (
     <div class="space-y-6">
@@ -86,6 +101,75 @@ export default function DayView(props: DayViewProps) {
           >
             + Add Todo
           </button>
+        </div>
+      </div>
+
+      {/* Weekly Template (recurring) card */}
+      <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card-body p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="card-title text-base font-bold capitalize">
+                ⟳ Weekly Template
+              </h2>
+              <p class="text-xs text-base-content/60">
+                Recurring busy blocks and sleep windows repeat every week; any
+                one-off sleep override replaces this day's template sleep for
+                one week.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              onClick={() =>
+                props.onOpenTemplate?.(props.store.selectedDay())
+              }
+            >
+              Edit Template
+            </button>
+          </div>
+
+          <Show
+            when={hasRecurring()}
+            fallback={
+              <div class="py-3 text-center text-xs text-base-content/40 italic">
+                No recurring template for {props.store.selectedDay()}. Click
+                "Edit Template" to add recurring blocks.
+              </div>
+            }
+          >
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              <For each={recurringBlocks()}>
+                {(block) => (
+                  <div
+                    class={`rounded-md px-2 py-1 text-xs border border-dashed ${
+                      block._tag === "sleep"
+                        ? "border-secondary bg-secondary/10 text-secondary-content"
+                        : "border-primary bg-primary/10 text-primary-content"
+                    }`}
+                  >
+                    <span class="font-medium">
+                      {block._tag === "sleep"
+                        ? "Sleep"
+                        : block.title}
+                    </span>
+                    <span class="font-mono text-[10px] opacity-75 ml-1.5">
+                      {formatTimeSpan(block.start, block.end)}
+                    </span>
+                    <span
+                      class={`badge badge-xs ml-1.5 ${
+                        block.source === "override"
+                          ? "badge-secondary"
+                          : "badge-ghost"
+                      }`}
+                    >
+                      {block.source === "override" ? "override" : "template"}
+                    </span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
         </div>
       </div>
 
@@ -180,6 +264,12 @@ export default function DayView(props: DayViewProps) {
                             </span>
                             <span class="badge badge-xs badge-outline opacity-70 uppercase text-[9px]">
                               {item._tag}
+                            </span>
+                            <span
+                              class="badge badge-xs badge-outline uppercase text-[9px]"
+                              title="One-off item (this week only)"
+                            >
+                              one-off
                             </span>
                           </div>
                           <div class="text-xs opacity-80 font-mono mt-0.5">

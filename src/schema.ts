@@ -171,7 +171,7 @@ export const TemplateBusy = Schema.Struct({
   title: Schema.NonEmptyString,
   start: DayTime,
   end: DayTime,
-}).pipe(nonZeroSpan);
+}).pipe(forwardSpan);
 export type TemplateBusy = typeof TemplateBusy.Type;
 
 /** Recurring sleep window inside a day's template. May cross midnight. */

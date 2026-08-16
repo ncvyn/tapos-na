@@ -244,6 +244,148 @@ describe("state store & actions seam", () => {
     });
   });
 
+  describe("weekly template CRUD", () => {
+    it("adds, updates, and deletes template busy blocks", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      store.addTemplateBusy("monday", {
+        id: "tb-1",
+        title: "Math Lecture",
+        start: 540,
+        end: 600,
+      });
+      expect(store.doc.days.monday.template.busy).toHaveLength(1);
+      expect(store.doc.days.monday.template.busy[0].title).toBe("Math Lecture");
+
+      store.updateTemplateBusy("monday", {
+        id: "tb-1",
+        title: "Advanced Math",
+        start: 540,
+        end: 630,
+      });
+      expect(store.doc.days.monday.template.busy[0]).toMatchObject({
+        title: "Advanced Math",
+        end: 630,
+      });
+
+      store.deleteTemplateBusy("monday", "tb-1");
+      expect(store.doc.days.monday.template.busy).toHaveLength(0);
+
+      vi.advanceTimersByTime(50);
+      const persistedDoc = await Effect.runPromise(
+        Effect.provide(
+          Effect.gen(function* () {
+            const storage = yield* StorageService;
+            return yield* storage.loadDoc();
+          }),
+          memoryLayer,
+        ),
+      );
+      expect(persistedDoc.days.monday.template.busy).toHaveLength(0);
+    });
+
+    it("adds, updates, and deletes template sleep windows (incl. cross-midnight)", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      store.addTemplateSleep("tuesday", { id: "ts-1", start: 1380, end: 420 });
+      expect(store.doc.days.tuesday.template.sleep).toHaveLength(1);
+      expect(store.doc.days.tuesday.template.sleep[0]).toMatchObject({
+        start: 1380,
+        end: 420,
+      });
+
+      store.updateTemplateSleep("tuesday", { id: "ts-1", start: 1320, end: 480 });
+      expect(store.doc.days.tuesday.template.sleep[0].start).toBe(1320);
+
+      store.deleteTemplateSleep("tuesday", "ts-1");
+      expect(store.doc.days.tuesday.template.sleep).toHaveLength(0);
+    });
+
+    it("template busy and sleep stay on their own day (no cross-day leakage)", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer);
+      await store.load();
+
+      store.addTemplateBusy("monday", {
+        id: "tb-1",
+        title: "Class",
+        start: 540,
+        end: 600,
+      });
+      store.addTemplateSleep("monday", { id: "ts-1", start: 1380, end: 420 });
+
+      expect(store.doc.days.monday.template.busy).toHaveLength(1);
+      expect(store.doc.days.tuesday.template.busy).toHaveLength(0);
+      expect(store.doc.days.tuesday.template.sleep).toHaveLength(0);
+    });
+  });
+
+  describe("sleep override", () => {
+    it("sets a one-off sleep override for one day, leaving other days' template sleep intact", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      store.addTemplateSleep("monday", { id: "ts-1", start: 1380, end: 420 });
+      store.addTemplateSleep("tuesday", { id: "ts-2", start: 1380, end: 420 });
+
+      store.setSleepOverride("monday", [{ start: 60, end: 540 }]);
+
+      expect(store.doc.days.monday.sleepOverride).toEqual([
+        { start: 60, end: 540 },
+      ]);
+      // Template sleep untouched, and other days untouched
+      expect(store.doc.days.monday.template.sleep).toHaveLength(1);
+      expect(store.doc.days.tuesday.sleepOverride).toBeUndefined();
+      expect(store.doc.days.tuesday.template.sleep).toHaveLength(1);
+
+      vi.advanceTimersByTime(50);
+      const persistedDoc = await Effect.runPromise(
+        Effect.provide(
+          Effect.gen(function* () {
+            const storage = yield* StorageService;
+            return yield* storage.loadDoc();
+          }),
+          memoryLayer,
+        ),
+      );
+      expect(persistedDoc.days.monday.sleepOverride).toEqual([
+        { start: 60, end: 540 },
+      ]);
+      expect(persistedDoc.days.tuesday.sleepOverride).toBeUndefined();
+    });
+
+    it("clearing an override restores template sleep and persists", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      store.addTemplateSleep("monday", { id: "ts-1", start: 1380, end: 420 });
+      store.setSleepOverride("monday", [{ start: 60, end: 540 }]);
+      expect(store.doc.days.monday.sleepOverride).toBeDefined();
+
+      store.clearSleepOverride("monday");
+      expect(store.doc.days.monday.sleepOverride).toBeUndefined();
+
+      vi.advanceTimersByTime(50);
+      const persistedDoc = await Effect.runPromise(
+        Effect.provide(
+          Effect.gen(function* () {
+            const storage = yield* StorageService;
+            return yield* storage.loadDoc();
+          }),
+          memoryLayer,
+        ),
+      );
+      expect(persistedDoc.days.monday.sleepOverride).toBeUndefined();
+      expect(persistedDoc.days.monday.template.sleep).toHaveLength(1);
+    });
+  });
+
   describe("todo CRUD", () => {
     it("adds, updates, and deletes todos optimistically", async () => {
       const memoryLayer = makeMemoryStorageLayer();

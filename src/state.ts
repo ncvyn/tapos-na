@@ -22,6 +22,9 @@ import {
   type Event,
   type Settings,
   type Sleep,
+  type SleepBlock,
+  type TemplateBusy,
+  type TemplateSleep,
   type Todo,
 } from "./schema";
 import {
@@ -202,6 +205,96 @@ export function createCalendarStore(
   };
 
   // -------------------------------------------------------------------------
+  // Weekly Template CRUD (busy blocks & sleep windows per day)
+  // -------------------------------------------------------------------------
+
+  const addTemplateBusy = (day: DayOfWeek, block: TemplateBusy) => {
+    setDoc(
+      "days",
+      day,
+      "template",
+      "busy",
+      [...doc.days[day].template.busy, block],
+    );
+    scheduleSave();
+  };
+
+  const updateTemplateBusy = (day: DayOfWeek, block: TemplateBusy) => {
+    setDoc(
+      "days",
+      day,
+      "template",
+      "busy",
+      doc.days[day].template.busy.map((existing) =>
+        existing.id === block.id ? block : existing,
+      ),
+    );
+    scheduleSave();
+  };
+
+  const deleteTemplateBusy = (day: DayOfWeek, id: string) => {
+    setDoc(
+      "days",
+      day,
+      "template",
+      "busy",
+      doc.days[day].template.busy.filter((existing) => existing.id !== id),
+    );
+    scheduleSave();
+  };
+
+  const addTemplateSleep = (day: DayOfWeek, block: TemplateSleep) => {
+    setDoc(
+      "days",
+      day,
+      "template",
+      "sleep",
+      [...doc.days[day].template.sleep, block],
+    );
+    scheduleSave();
+  };
+
+  const updateTemplateSleep = (day: DayOfWeek, block: TemplateSleep) => {
+    setDoc(
+      "days",
+      day,
+      "template",
+      "sleep",
+      doc.days[day].template.sleep.map((existing) =>
+        existing.id === block.id ? block : existing,
+      ),
+    );
+    scheduleSave();
+  };
+
+  const deleteTemplateSleep = (day: DayOfWeek, id: string) => {
+    setDoc(
+      "days",
+      day,
+      "template",
+      "sleep",
+      doc.days[day].template.sleep.filter((existing) => existing.id !== id),
+    );
+    scheduleSave();
+  };
+
+  // -------------------------------------------------------------------------
+  // Sleep override (one-off, per day)
+  // -------------------------------------------------------------------------
+
+  /** Replace the day's template sleep with a one-off set of windows. */
+  const setSleepOverride = (day: DayOfWeek, blocks: SleepBlock[]) => {
+    setDoc("days", day, "sleepOverride", blocks);
+    scheduleSave();
+  };
+
+  /** Remove the day's sleep override, restoring template sleep. */
+  const clearSleepOverride = (day: DayOfWeek) => {
+    setDoc("days", day, "sleepOverride", undefined);
+    scheduleSave();
+  };
+
+  // -------------------------------------------------------------------------
   // Todo CRUD
   // -------------------------------------------------------------------------
 
@@ -311,6 +404,14 @@ export function createCalendarStore(
     addSleep,
     updateSleep,
     deleteSleep,
+    addTemplateBusy,
+    updateTemplateBusy,
+    deleteTemplateBusy,
+    addTemplateSleep,
+    updateTemplateSleep,
+    deleteTemplateSleep,
+    setSleepOverride,
+    clearSleepOverride,
     addTodo,
     updateTodo,
     deleteTodo,
