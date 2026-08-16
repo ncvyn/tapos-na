@@ -10,7 +10,10 @@
  * 3. Configurable work & break lengths; long break after every 4th pomodoro on a day.
  * 4. Mini-focus = 0.5 pomodoro filling gaps shorter than workLength (toggleable).
  * 5. Due date = hard bound (todos are not scheduled past their due date).
- * 6. Pure & deterministic — no I/O, no DOM, fixed outputs for fixed inputs.
+ * 6. Overflow spills to the next day morning-first, re-sorted against that
+ *    day's priorities; at equal priority a day's not-yet-started work keeps
+ *    its slot over a carried spill (spill displaces only strictly-lower work).
+ * 7. Pure & deterministic — no I/O, no DOM, fixed outputs for fixed inputs.
  */
 
 import {
@@ -110,6 +113,15 @@ export function getDayIndex(day: DayOfWeek): number {
 /** Compare priorities for sorting (P0 comes first). */
 export function comparePriority(a: Priority, b: Priority): number {
   return PRIORITY_ORDER[a] - PRIORITY_ORDER[b];
+}
+
+/**
+ * True when a todo has already had pomodoros scheduled on earlier days
+ * (`remaining < planned`) — i.e. it is a carried-over spill rather than work
+ * fresh to the current day.
+ */
+function isCarriedTodo(tp: TodoProgress): boolean {
+  return tp.remainingPomodoros < tp.todo.pomodoros;
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +322,14 @@ export function computeDaySchedule(
       }
       return true;
     })
-    .sort((a, b) => comparePriority(a.todo.priority, b.todo.priority));
+    .sort((a, b) => {
+      const byPriority = comparePriority(a.todo.priority, b.todo.priority);
+      if (byPriority !== 0) return byPriority;
+      // Ties (same priority): a todo fresh to this day keeps its slot over a
+      // carried-over spill — a spill displaces only strictly-lower-priority
+      // work, so P0 never bumps a P0 already planned.
+      return (isCarriedTodo(a) ? 1 : 0) - (isCarriedTodo(b) ? 1 : 0);
+    });
 
   let dayPomodoroCount = 0; // counts full pomodoros on this day for long break cadence
   const miniFocusLength = settings.workLength / 2;
