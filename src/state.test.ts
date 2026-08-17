@@ -231,6 +231,50 @@ describe("state store & actions seam", () => {
       );
       expect(persistedDoc.settings.weekStart).toBe("sunday");
     });
+
+    it("round-trips every settings field (incl. apiKey) through store and storage reload", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      store.updateSettings({
+        weekStart: "sunday",
+        workLength: 50,
+        breakLength: 10,
+        longBreakLength: 60,
+        miniFocus: false,
+        apiKey: "r2-secret-key",
+      });
+
+      expect(store.doc.settings).toMatchObject({
+        weekStart: "sunday",
+        workLength: 50,
+        breakLength: 10,
+        longBreakLength: 60,
+        miniFocus: false,
+        apiKey: "r2-secret-key",
+      });
+
+      vi.advanceTimersByTime(50);
+
+      const persistedDoc = await Effect.runPromise(
+        Effect.provide(
+          Effect.gen(function* () {
+            const storage = yield* StorageService;
+            return yield* storage.loadDoc();
+          }),
+          memoryLayer,
+        ),
+      );
+      expect(persistedDoc.settings).toMatchObject({
+        weekStart: "sunday",
+        workLength: 50,
+        breakLength: 10,
+        longBreakLength: 60,
+        miniFocus: false,
+        apiKey: "r2-secret-key",
+      });
+    });
   });
 
   describe("viewMode and navigation", () => {

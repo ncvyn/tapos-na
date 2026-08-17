@@ -33,6 +33,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [breakLength, setBreakLength] = createSignal(5);
   const [longBreakLength, setLongBreakLength] = createSignal(30);
   const [miniFocus, setMiniFocus] = createSignal(true);
+  const [apiKey, setApiKey] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
 
   createEffect(() => {
@@ -44,6 +45,9 @@ export default function SettingsModal(props: SettingsModalProps) {
     setBreakLength(settings.breakLength);
     setLongBreakLength(settings.longBreakLength);
     setMiniFocus(settings.miniFocus);
+    // TODO(r2): read site for the phase-2 R2 API key. Persisted to localStorage
+    // today; no behavior depends on it yet. It must never be written to exports.
+    setApiKey(settings.apiKey ?? "");
     setError(null);
   });
 
@@ -66,6 +70,7 @@ export default function SettingsModal(props: SettingsModalProps) {
       breakLength: Number(breakLength()),
       longBreakLength: Number(longBreakLength()),
       miniFocus: miniFocus(),
+      apiKey: apiKey().trim() === "" ? undefined : apiKey().trim(),
     };
 
     props.store.updateSettings(updated);
@@ -219,6 +224,25 @@ export default function SettingsModal(props: SettingsModalProps) {
                   onChange={(e) => setMiniFocus(e.currentTarget.checked)}
                 />
               </label>
+            </div>
+
+            {/* R2 API Key */}
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text font-medium">R2 API Key</span>
+              </label>
+              <input
+                type="password"
+                class="input input-bordered input-sm font-mono text-xs"
+                placeholder="Phase-2 Cloudflare R2 key"
+                value={apiKey()}
+                onInput={(e) => setApiKey(e.currentTarget.value)}
+                autocomplete="off"
+              />
+              <p class="text-xs text-base-content/60 mt-1">
+                Stored locally for the phase-2 R2 backend (TODO(r2)). No behavior
+                depends on it yet; it is never written to exported docs.
+              </p>
             </div>
 
             <div class="modal-action border-t border-base-200 pt-3">

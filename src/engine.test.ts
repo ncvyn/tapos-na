@@ -274,6 +274,39 @@ describe("Work/Break Lengths & Long Break Cadence", () => {
     // Break 5 should be short again
     expect(breaks[4].breakType).toBe("short");
   });
+
+  it("honors a custom long break length after the 4th pomodoro", () => {
+    const customSettings: Settings = {
+      ...defaultSettings,
+      longBreakLength: 60,
+    };
+
+    const day: Day = {
+      template: { busy: [], sleep: [{ id: "s1", start: 0, end: 480 }] }, // free at 480
+      items: [],
+    };
+
+    const todos: Todo[] = [
+      { _tag: "todo", id: "t1", title: "Big Task", pomodoros: 5, priority: "P0" },
+    ];
+
+    const { daySchedule } = computeDaySchedule(
+      day,
+      todos.map((t) => ({ todo: t, remainingPomodoros: t.pomodoros })),
+      customSettings,
+      "monday",
+    );
+
+    const breaks = daySchedule.segments.filter((s) => s._tag === "break");
+    const longBreak = breaks.find((b) => b.breakType === "long");
+    expect(longBreak).toBeDefined();
+    expect(longBreak!.end - longBreak!.start).toBe(60); // 60 mins, not 30
+    // Short breaks still use the default 5-minute length
+    expect(breaks[0]).toMatchObject({
+      breakType: "short",
+      end: breaks[0].start + defaultSettings.breakLength,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
