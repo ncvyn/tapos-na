@@ -12,16 +12,24 @@ import {
   type DaySchedule,
   type ScheduledSegment,
 } from "../engine";
+import {
+  beginDrag,
+  commitDropOnDay,
+  getDragPayload,
+  wouldPayloadCollide,
+} from "../drag";
 import type { CalendarStore } from "../state";
 import { formatTimeSpan, getTodayWeekday, minutesToTime } from "../time";
-import { ITEM_ICONS, ITEM_THEMES, PRIORITY_BADGES } from "./itemStyles";
+import { PRIORITY_BADGES } from "./itemStyles";
 import type { ItemType } from "./ItemModal";
+import TimeGrid from "./TimeGrid";
 
 interface DayViewProps {
   store: CalendarStore;
   onOpenAddItem?: (day: DayOfWeek, defaultType?: ItemType) => void;
   onOpenEditItem?: (item: DayItem | Todo) => void;
   onOpenTemplate?: (day: DayOfWeek) => void;
+  onDropRefused?: (reason: string) => void;
 }
 
 export default function DayView(props: DayViewProps) {
@@ -50,6 +58,29 @@ export default function DayView(props: DayViewProps) {
 
   const hasRecurring = createMemo(() => recurringBlocks().length > 0);
 
+  const handleDayTabDragOver = (e: DragEvent, targetDay: DayOfWeek) => {
+    const dt = e.dataTransfer;
+    if (!dt) return;
+    const payload = getDragPayload(dt);
+    if (!payload) return;
+    e.preventDefault();
+    const collides =
+      payload.kind === "day-item" &&
+      wouldPayloadCollide(props.store, payload, targetDay, {
+        start: payload.item.start,
+        end: payload.item.end,
+      });
+    dt.dropEffect = collides ? "none" : "move";
+  };
+
+  const handleDayTabDrop = (e: DragEvent, targetDay: DayOfWeek) => {
+    e.preventDefault();
+    const payload = getDragPayload(e.dataTransfer);
+    if (!payload) return;
+    const result = commitDropOnDay(props.store, payload, targetDay);
+    if (!result.ok) props.onDropRefused?.(result.reason);
+  };
+
   return (
     <div class="space-y-6">
       {/* Day Selector Tabs */}
@@ -68,6 +99,9 @@ export default function DayView(props: DayViewProps) {
                     isSelected() ? "btn-primary" : "btn-ghost"
                   }`}
                   onClick={() => props.store.setSelectedDay(day)}
+                  onDragOver={(e) => handleDayTabDragOver(e, day)}
+                  onDrop={(e) => handleDayTabDrop(e, day)}
+                  title={`Switch to ${day} day view (drop an item here to move it to ${day})`}
                 >
                   <span class="capitalize">{DAY_LABELS[day]}</span>
                   <Show when={isToday()}>
@@ -240,68 +274,29 @@ export default function DayView(props: DayViewProps) {
               </div>
             </div>
 
-            <div class="mt-3 space-y-2">
+            <div class="mt-3 space-y-1.5">
+              <div class="text-[10px] text-base-content/50">
+                Drag a block vertically to change its time, or onto a day tab
+                above to move it to another day. Overlapping drops are refused.
+              </div>
               <Show
                 when={selectedDayItems().length > 0}
                 fallback={
                   <div class="py-8 text-center text-xs text-base-content/40 italic">
                     No fixed commitments on {props.store.selectedDay()}.
+                    Drop an item here from another day or add one above.
                   </div>
                 }
               >
-                <For each={selectedDayItems()}>
-                  {(item) => {
-                    const theme = ITEM_THEMES[item._tag];
-                    return (
-                      <div
-                        class={`rounded-lg p-2.5 border transition-all flex items-center justify-between ${theme.card}`}
-                      >
-                        <div class="min-w-0 pr-2">
-                          <div class="flex items-center gap-1.5 truncate text-sm font-medium">
-                            <span>{ITEM_ICONS[item._tag]}</span>
-                            <span class="truncate">
-                              {item._tag === "sleep" ? theme.name : item.title}
-                            </span>
-                            <span class="badge badge-xs badge-outline opacity-70 uppercase text-[9px]">
-                              {item._tag}
-                            </span>
-                            <span
-                              class="badge badge-xs badge-outline uppercase text-[9px]"
-                              title="One-off item (this week only)"
-                            >
-                              one-off
-                            </span>
-                          </div>
-                          <div class="text-xs opacity-80 font-mono mt-0.5">
-                            {formatTimeSpan(item.start, item.end)}
-                          </div>
-                        </div>
-
-                        <div class="flex gap-1 shrink-0">
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-xs"
-                            onClick={() => props.onOpenEditItem?.(item)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-xs text-error"
-                            onClick={() =>
-                              props.store.deleteDayItem(
-                                props.store.selectedDay(),
-                                item.id,
-                              )
-                            }
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }}
-                </For>
+                <div class="max-h-[70vh] overflow-y-auto rounded-lg border border-base-200 bg-base-200/30 p-1">
+                  <TimeGrid
+                    store={props.store}
+                    day={props.store.selectedDay()}
+                    items={selectedDayItems()}
+                    onOpenEditItem={(item) => props.onOpenEditItem?.(item)}
+                    onDropRefused={props.onDropRefused}
+                  />
+                </div>
               </Show>
             </div>
           </div>
@@ -339,7 +334,14 @@ export default function DayView(props: DayViewProps) {
               >
                 <For each={props.store.doc.todos}>
                   {(todo) => (
-                    <div class="flex items-center justify-between py-2.5">
+                    <div
+                      class="flex items-center justify-between py-2.5 cursor-grab active:cursor-grabbing"
+                      draggable
+                      onDragStart={(e) =>
+                        beginDrag(e.dataTransfer, { kind: "todo", item: todo })
+                      }
+                      title="Drag onto a day (tab or grid) to set its due date"
+                    >
                       <div class="min-w-0 pr-2">
                         <div class="flex items-center gap-1.5 truncate">
                           <span

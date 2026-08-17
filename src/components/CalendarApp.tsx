@@ -28,6 +28,15 @@ export default function CalendarApp() {
   const [templateModalOpen, setTemplateModalOpen] = createSignal(false);
   const [templateModalDay, setTemplateModalDay] = createSignal<DayOfWeek>("monday");
 
+  // Drag & drop feedback: refused drops surface here and auto-dismiss.
+  const [dragNotice, setDragNotice] = createSignal<string | null>(null);
+  let dragNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+  const notifyDropRefused = (reason: string) => {
+    setDragNotice(reason);
+    if (dragNoticeTimer !== null) clearTimeout(dragNoticeTimer);
+    dragNoticeTimer = setTimeout(() => setDragNotice(null), 3500);
+  };
+
   const handleOpenTemplate = (day: DayOfWeek) => {
     setTemplateModalDay(day);
     setTemplateModalOpen(true);
@@ -156,6 +165,24 @@ export default function CalendarApp() {
       {/* Live wall-clock timer bar */}
       <ClockBar store={store} />
 
+      {/* Drag & drop refusal toast */}
+      <Show when={dragNotice()}>
+        <div class="fixed left-1/2 top-4 z-50 w-auto -translate-x-1/2">
+          <div class="alert alert-error text-xs shadow-lg px-4 py-2 flex items-center gap-2">
+            <span>⛔</span>
+            <span>{dragNotice()}</span>
+            <button
+              type="button"
+              class="btn btn-ghost btn-xs"
+              onClick={() => setDragNotice(null)}
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      </Show>
+
       {/* Error banner */}
       <Show when={store.errorMessage()}>
         <div class="mx-auto max-w-7xl px-4 pt-4 w-full">
@@ -186,6 +213,7 @@ export default function CalendarApp() {
               onOpenAddItem={(day) => handleOpenAddItem(day)}
               onOpenEditItem={handleOpenEditItem}
               onOpenTemplate={handleOpenTemplate}
+              onDropRefused={notifyDropRefused}
             />
           </Show>
 
@@ -195,6 +223,7 @@ export default function CalendarApp() {
               onOpenAddItem={(day, type) => handleOpenAddItem(day, type)}
               onOpenEditItem={handleOpenEditItem}
               onOpenTemplate={handleOpenTemplate}
+              onDropRefused={notifyDropRefused}
             />
           </Show>
         </Show>

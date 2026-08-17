@@ -1,4 +1,4 @@
-import { createMemo, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import {
   DAY_LABELS,
   type DayItem,
@@ -11,6 +11,12 @@ import {
   type DaySchedule,
   type ScheduledSegment,
 } from "../engine";
+import {
+  beginDrag,
+  commitDropOnDay,
+  getDragPayload,
+  wouldPayloadCollide,
+} from "../drag";
 import type { CalendarStore } from "../state";
 import { formatTimeSpan, getDisplayDays, getTodayWeekday, minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES, PRIORITY_BADGES } from "./itemStyles";
@@ -20,6 +26,7 @@ interface WeekViewProps {
   onOpenAddItem: (day: DayOfWeek, defaultType?: "busy" | "event" | "sleep" | "todo") => void;
   onOpenEditItem: (item: DayItem | Todo) => void;
   onOpenTemplate?: (day: DayOfWeek) => void;
+  onDropRefused?: (reason: string) => void;
 }
 
 export default function WeekView(props: WeekViewProps) {
@@ -38,6 +45,34 @@ export default function WeekView(props: WeekViewProps) {
   const isSundayFirst = createMemo(() => {
     return props.store.doc.settings.weekStart === "sunday";
   });
+
+  const [dropHighlight, setDropHighlight] = createSignal<DayOfWeek | null>(null);
+
+  const handleColumnDragOver = (e: DragEvent, day: DayOfWeek) => {
+    const dt = e.dataTransfer;
+    if (!dt) return;
+    const payload = getDragPayload(dt);
+    if (!payload) return;
+    e.preventDefault();
+    const collides =
+      payload.kind === "day-item" &&
+      wouldPayloadCollide(props.store, payload, day, {
+        start: payload.item.start,
+        end: payload.item.end,
+      });
+    dt.dropEffect = collides ? "none" : "move";
+    if (!collides) setDropHighlight(day);
+    else if (dropHighlight() === day) setDropHighlight(null);
+  };
+
+  const handleColumnDrop = (e: DragEvent, day: DayOfWeek) => {
+    e.preventDefault();
+    setDropHighlight(null);
+    const payload = getDragPayload(e.dataTransfer);
+    if (!payload) return;
+    const result = commitDropOnDay(props.store, payload, day);
+    if (!result.ok) props.onDropRefused?.(result.reason);
+  };
 
   return (
     <div class="space-y-6">
@@ -68,7 +103,20 @@ export default function WeekView(props: WeekViewProps) {
                   isToday()
                     ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
                     : "border-base-300 bg-base-100 shadow-xs hover:border-base-content/20"
+                } ${
+                  dropHighlight() === day
+                    ? "ring-2 ring-info/50 border-info"
+                    : ""
                 }`}
+                {...(!isSundayFirstEmptyCol()
+                  ? {
+                      onDragOver: (e: DragEvent) => handleColumnDragOver(e, day),
+                      onDrop: (e: DragEvent) => handleColumnDrop(e, day),
+                      onDragLeave: () => {
+                        if (dropHighlight() === day) setDropHighlight(null);
+                      },
+                    }
+                  : {})}
               >
                 {/* Column Header */}
                 <div
@@ -217,8 +265,16 @@ export default function WeekView(props: WeekViewProps) {
                               const theme = ITEM_THEMES[item._tag];
                               return (
                                 <div
-                                  class={`group relative rounded-md p-2 text-xs transition-all cursor-pointer border ${theme.card}`}
+                                  class={`group relative rounded-md p-2 text-xs transition-all cursor-grab active:cursor-grabbing border ${theme.card}`}
+                                  draggable
+                                  onDragStart={(e) =>
+                                    beginDrag(e.dataTransfer, {
+                                      kind: "day-item",
+                                      item,
+                                    })
+                                  }
                                   onClick={() => props.onOpenEditItem(item)}
+                                  title="Drag to another day column to move it (same time)"
                                 >
                                   <div class="flex items-start justify-between gap-1">
                                     <div class="font-medium truncate flex items-center gap-1">
@@ -384,7 +440,14 @@ export default function WeekView(props: WeekViewProps) {
               <div class="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
                 <For each={props.store.doc.todos}>
                   {(todo) => (
-                    <div class="flex items-center justify-between rounded-lg border border-base-200 bg-base-200/40 p-2.5 transition-all hover:border-base-300">
+                    <div
+                      class="flex items-center justify-between rounded-lg border border-base-200 bg-base-200/40 p-2.5 transition-all hover:border-base-300 cursor-grab active:cursor-grabbing"
+                      draggable
+                      onDragStart={(e) =>
+                        beginDrag(e.dataTransfer, { kind: "todo", item: todo })
+                      }
+                      title="Drag onto a day column to set its due date"
+                    >
                       <div class="min-w-0 pr-2">
                         <div class="flex items-center gap-1.5 truncate">
                           <span
