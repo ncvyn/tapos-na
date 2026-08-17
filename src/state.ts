@@ -32,6 +32,7 @@ import {
   makeLocalStorageLayer,
   StorageService,
 } from "./storage";
+import { findDayConflict, formatConflict } from "./conflicts";
 
 type Mutable<T> = {
   -readonly [P in keyof T]: T[P] extends object ? Mutable<T[P]> : T[P];
@@ -89,6 +90,17 @@ export function createCalendarStore(
     }, debounceMs);
   };
 
+  const rejectConflict = (
+    day: DayOfWeek,
+    candidate: Mutable<CalendarDoc>["days"][DayOfWeek],
+  ): boolean => {
+    const conflict = findDayConflict(candidate);
+    if (!conflict) return false;
+    setErrorMessage(formatConflict(conflict, day));
+    setStatus("error");
+    return true;
+  };
+
   const load = async (): Promise<void> => {
     const program = Effect.gen(function* () {
       const storage = yield* StorageService;
@@ -117,12 +129,28 @@ export function createCalendarStore(
 
   const addDayItem = (item: DayItem) => {
     const day = item.day;
+    const candidate = {
+      ...doc.days[day],
+      items: [...doc.days[day].items, item],
+    };
+    if (rejectConflict(day, candidate)) return false;
     setDoc("days", day, "items", [...doc.days[day].items, item]);
     scheduleSave();
+    return true;
   };
 
   const updateDayItem = (originalDay: DayOfWeek, item: DayItem) => {
     const targetDay = item.day;
+    const candidate = {
+      ...doc.days[targetDay],
+      items:
+        originalDay === targetDay
+          ? doc.days[targetDay].items.map((existing) =>
+              existing.id === item.id ? item : existing,
+            )
+          : [...doc.days[targetDay].items, item],
+    };
+    if (rejectConflict(targetDay, candidate)) return false;
     if (originalDay === targetDay) {
       setDoc(
         "days",
@@ -143,6 +171,7 @@ export function createCalendarStore(
       setDoc("days", targetDay, "items", [...doc.days[targetDay].items, item]);
     }
     scheduleSave();
+    return true;
   };
 
   const deleteDayItem = (day: DayOfWeek, id: string) => {
@@ -199,6 +228,14 @@ export function createCalendarStore(
   // -------------------------------------------------------------------------
 
   const addTemplateBusy = (day: DayOfWeek, block: TemplateBusy) => {
+    const candidate = {
+      ...doc.days[day],
+      template: {
+        ...doc.days[day].template,
+        busy: [...doc.days[day].template.busy, block],
+      },
+    };
+    if (rejectConflict(day, candidate)) return false;
     setDoc(
       "days",
       day,
@@ -207,9 +244,20 @@ export function createCalendarStore(
       [...doc.days[day].template.busy, block],
     );
     scheduleSave();
+    return true;
   };
 
   const updateTemplateBusy = (day: DayOfWeek, block: TemplateBusy) => {
+    const candidate = {
+      ...doc.days[day],
+      template: {
+        ...doc.days[day].template,
+        busy: doc.days[day].template.busy.map((existing) =>
+          existing.id === block.id ? block : existing,
+        ),
+      },
+    };
+    if (rejectConflict(day, candidate)) return false;
     setDoc(
       "days",
       day,
@@ -220,6 +268,7 @@ export function createCalendarStore(
       ),
     );
     scheduleSave();
+    return true;
   };
 
   const deleteTemplateBusy = (day: DayOfWeek, id: string) => {
@@ -234,6 +283,14 @@ export function createCalendarStore(
   };
 
   const addTemplateSleep = (day: DayOfWeek, block: TemplateSleep) => {
+    const candidate = {
+      ...doc.days[day],
+      template: {
+        ...doc.days[day].template,
+        sleep: [...doc.days[day].template.sleep, block],
+      },
+    };
+    if (rejectConflict(day, candidate)) return false;
     setDoc(
       "days",
       day,
@@ -242,9 +299,20 @@ export function createCalendarStore(
       [...doc.days[day].template.sleep, block],
     );
     scheduleSave();
+    return true;
   };
 
   const updateTemplateSleep = (day: DayOfWeek, block: TemplateSleep) => {
+    const candidate = {
+      ...doc.days[day],
+      template: {
+        ...doc.days[day].template,
+        sleep: doc.days[day].template.sleep.map((existing) =>
+          existing.id === block.id ? block : existing,
+        ),
+      },
+    };
+    if (rejectConflict(day, candidate)) return false;
     setDoc(
       "days",
       day,
@@ -255,6 +323,7 @@ export function createCalendarStore(
       ),
     );
     scheduleSave();
+    return true;
   };
 
   const deleteTemplateSleep = (day: DayOfWeek, id: string) => {
@@ -274,8 +343,11 @@ export function createCalendarStore(
 
   /** Replace the day's template sleep with a one-off set of windows. */
   const setSleepOverride = (day: DayOfWeek, blocks: SleepBlock[]) => {
+    const candidate = { ...doc.days[day], sleepOverride: blocks };
+    if (rejectConflict(day, candidate)) return false;
     setDoc("days", day, "sleepOverride", blocks);
     scheduleSave();
+    return true;
   };
 
   /** Remove the day's sleep override, restoring template sleep. */

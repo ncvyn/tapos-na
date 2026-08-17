@@ -91,6 +91,53 @@ describe("storage seam", () => {
       );
       expect(Exit.isFailure(result)).toBe(true);
     });
+
+    it("rejects import docs with overlapping day blocks", async () => {
+      const initialDoc = createDefaultDoc("Asia/Manila");
+      const conflictingDoc = {
+        ...initialDoc,
+        days: {
+          ...initialDoc.days,
+          monday: {
+            ...initialDoc.days.monday,
+            items: [
+              {
+                _tag: "busy" as const,
+                id: "busy-1",
+                title: "Test 1",
+                day: "monday" as const,
+                start: 0,
+                end: 120,
+              },
+              {
+                _tag: "event" as const,
+                id: "event-1",
+                title: "Test 2",
+                day: "monday" as const,
+                start: 0,
+                end: 120,
+              },
+              {
+                _tag: "busy" as const,
+                id: "busy-2",
+                title: "Test 3",
+                day: "monday" as const,
+                start: 0,
+                end: 240,
+              },
+            ],
+          },
+        },
+      };
+
+      const result = await Effect.runPromiseExit(
+        importDocJson(JSON.stringify(conflictingDoc)),
+      );
+      expect(Exit.isFailure(result)).toBe(true);
+      if (Exit.isFailure(result)) {
+        expect(JSON.stringify(result.cause)).toContain("overlap");
+      }
+    });
   });
 
   describe("StorageService (Memory Layer)", () => {

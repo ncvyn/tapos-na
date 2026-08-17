@@ -18,6 +18,7 @@ import {
   decodeCalendarDoc,
   encodeCalendarDoc,
 } from "./schema";
+import { findCalendarConflict, formatConflict } from "./conflicts";
 
 export const STORAGE_KEY = "tapos-na:calendar-doc:v1";
 
@@ -121,6 +122,14 @@ export function importDocJson(
           }),
         );
       }
+      const conflict = findCalendarConflict(decoded.right);
+      if (conflict) {
+        return Effect.fail(
+          new CorruptDocError({
+            message: `Calendar doc contains invalid overlap: ${formatConflict(conflict)}`,
+          }),
+        );
+      }
       return Effect.succeed(decoded.right);
     }),
   );
@@ -203,6 +212,12 @@ export function makeLocalStorageLayer(
                 cause: decoded.left,
               });
             }
+            const conflict = findCalendarConflict(decoded.right);
+            if (conflict) {
+              throw new CorruptDocError({
+                message: `Stored document contains invalid overlap: ${formatConflict(conflict)}`,
+              });
+            }
             return decoded.right;
           },
           catch: (error) => {
@@ -220,6 +235,12 @@ export function makeLocalStorageLayer(
           try: () => {
             const store = getStorage();
             if (!store) return;
+            const conflict = findCalendarConflict(doc);
+            if (conflict) {
+              throw new StorageError({
+                message: `Cannot save document with invalid overlap: ${formatConflict(conflict)}`,
+              });
+            }
             const encoded = encodeCalendarDoc(doc);
             store.setItem(storageKey, JSON.stringify(encoded));
           },

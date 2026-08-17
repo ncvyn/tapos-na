@@ -97,10 +97,12 @@ export default function TemplateModal(props: TemplateModalProps) {
 
     const id = busyEditingId() ?? crypto.randomUUID();
     const block = { id, title, start: startMin, end: endMin };
-    if (busyEditingId()) {
-      props.store.updateTemplateBusy(day(), block);
-    } else {
-      props.store.addTemplateBusy(day(), block);
+    const saved = busyEditingId()
+      ? props.store.updateTemplateBusy(day(), block)
+      : props.store.addTemplateBusy(day(), block);
+    if (!saved) {
+      setErrorMessage(props.store.errorMessage() ?? "Blocks overlap");
+      return;
     }
     setBusyEditingId(null);
     setBusyTitle("");
@@ -129,10 +131,12 @@ export default function TemplateModal(props: TemplateModalProps) {
 
     const id = sleepEditingId() ?? crypto.randomUUID();
     const window = { id, start: startMin, end: endMin };
-    if (sleepEditingId()) {
-      props.store.updateTemplateSleep(day(), window);
-    } else {
-      props.store.addTemplateSleep(day(), window);
+    const saved = sleepEditingId()
+      ? props.store.updateTemplateSleep(day(), window)
+      : props.store.addTemplateSleep(day(), window);
+    if (!saved) {
+      setErrorMessage(props.store.errorMessage() ?? "Blocks overlap");
+      return;
     }
     setSleepEditingId(null);
     setSleepStart("22:00");
@@ -159,7 +163,14 @@ export default function TemplateModal(props: TemplateModalProps) {
     }
 
     const current = sleepOverride() ?? [];
-    props.store.setSleepOverride(day(), [...current, { start: startMin, end: endMin }]);
+    const saved = props.store.setSleepOverride(day(), [
+      ...current,
+      { start: startMin, end: endMin },
+    ]);
+    if (!saved) {
+      setErrorMessage(props.store.errorMessage() ?? "Blocks overlap");
+      return;
+    }
     setOverrideStart("22:00");
     setOverrideEnd("07:00");
   };

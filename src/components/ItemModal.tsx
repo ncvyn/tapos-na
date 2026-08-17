@@ -144,10 +144,13 @@ export default function ItemModal(props: ItemModalProps) {
           end: endMin,
         };
 
-        if (isEdit && originalDay()) {
-          props.store.updateDayItem(originalDay()!, dayItem);
-        } else {
-          props.store.addDayItem(dayItem);
+        const saved =
+          isEdit && originalDay()
+            ? props.store.updateDayItem(originalDay()!, dayItem)
+            : props.store.addDayItem(dayItem);
+        if (!saved) {
+          setErrorMessage(props.store.errorMessage() ?? "Blocks overlap");
+          return;
         }
       } else if (type === "sleep") {
         if (startMin === endMin) {
@@ -163,10 +166,13 @@ export default function ItemModal(props: ItemModalProps) {
           end: endMin,
         };
 
-        if (isEdit && originalDay()) {
-          props.store.updateDayItem(originalDay()!, sleepItem);
-        } else {
-          props.store.addDayItem(sleepItem);
+        const saved =
+          isEdit && originalDay()
+            ? props.store.updateDayItem(originalDay()!, sleepItem)
+            : props.store.addDayItem(sleepItem);
+        if (!saved) {
+          setErrorMessage(props.store.errorMessage() ?? "Blocks overlap");
+          return;
         }
       }
     }

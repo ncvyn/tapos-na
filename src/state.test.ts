@@ -109,6 +109,32 @@ describe("state store & actions seam", () => {
     });
   });
 
+  it("refuses an overlapping block", async () => {
+    const memoryLayer = makeMemoryStorageLayer();
+    const store = createCalendarStore(memoryLayer);
+    await store.load();
+
+    store.addBusy("monday", {
+      _tag: "busy",
+      id: "busy-1",
+      title: "Test 1",
+      day: "monday",
+      start: 0,
+      end: 120,
+    });
+    store.addEvent("monday", {
+      _tag: "event",
+      id: "event-1",
+      title: "Test 2",
+      day: "monday",
+      start: 0,
+      end: 120,
+    });
+
+    expect(store.doc.days.monday.items).toHaveLength(1);
+    expect(store.errorMessage()).toContain("overlap");
+  });
+
   describe("event item CRUD", () => {
     it("adds, updates, and deletes event items optimistically", async () => {
       const memoryLayer = makeMemoryStorageLayer();
