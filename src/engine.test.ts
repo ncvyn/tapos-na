@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import {
   computeDaySchedule,
   computeSchedule,
-  getFreeSpans,
   type TodoProgress,
   type WorkSegment,
 } from "./engine";
@@ -58,108 +57,7 @@ function createSampleDoc(): CalendarDoc {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Free Spans Computation
-// ---------------------------------------------------------------------------
-
-describe("Free Spans Computation (getFreeSpans)", () => {
-  it("an empty day has a single free span covering [0, 1440]", () => {
-    const day = createEmptyDay();
-    const spans = getFreeSpans(day);
-    expect(spans).toEqual([{ start: 0, end: 1440 }]);
-  });
-
-  it("excludes template busy blocks, item busy blocks, and item events", () => {
-    const day: Day = {
-      template: {
-        busy: [{ id: "tb1", title: "Class", start: 540, end: 600 }], // 09:00 - 10:00
-        sleep: [],
-      },
-      items: [
-        { _tag: "busy", id: "b1", title: "Work", day: "monday", start: 840, end: 960 }, // 14:00 - 16:00
-        { _tag: "event", id: "e1", title: "Doctor", day: "monday", start: 720, end: 780 }, // 12:00 - 13:00
-      ],
-    };
-
-    const spans = getFreeSpans(day);
-    // Free spans should be: [0, 540], [600, 720], [780, 840], [960, 1440]
-    expect(spans).toEqual([
-      { start: 0, end: 540 },
-      { start: 600, end: 720 },
-      { start: 780, end: 840 },
-      { start: 960, end: 1440 },
-    ]);
-  });
-
-  it("excludes one-off sleep items (e.g. afternoon nap) from free spans", () => {
-    const day: Day = {
-      template: { busy: [], sleep: [] },
-      items: [
-        { _tag: "sleep", id: "nap-1", day: "tuesday", start: 780, end: 840 }, // 13:00 - 14:00 nap
-      ],
-    };
-
-    const spans = getFreeSpans(day);
-    expect(spans).toEqual([
-      { start: 0, end: 780 },
-      { start: 840, end: 1440 },
-    ]);
-  });
-
-  it("handles night sleep windows that cross midnight (start > end)", () => {
-    const day: Day = {
-      template: {
-        busy: [],
-        sleep: [{ id: "ts1", start: 1380, end: 420 }], // 23:00 -> 07:00
-      },
-      items: [],
-    };
-
-    const spans = getFreeSpans(day);
-    // Sleep covers [0, 420] and [1380, 1440]. Free span is [420, 1380].
-    expect(spans).toEqual([{ start: 420, end: 1380 }]);
-  });
-
-  it("sleepOverride replaces template sleep for that day", () => {
-    const day: Day = {
-      template: {
-        busy: [],
-        sleep: [{ id: "ts1", start: 1380, end: 420 }], // 23:00 -> 07:00
-      },
-      items: [],
-      // Override with a late sleep: 01:00 -> 09:00
-      sleepOverride: [{ start: 60, end: 540 }],
-    };
-
-    const spans = getFreeSpans(day);
-    // Free span should be: [0, 60] and [540, 1440]
-    expect(spans).toEqual([
-      { start: 0, end: 60 },
-      { start: 540, end: 1440 },
-    ]);
-  });
-
-  it("merges overlapping and adjacent occupied intervals", () => {
-    const day: Day = {
-      template: {
-        busy: [{ id: "tb1", title: "Part 1", start: 500, end: 600 }],
-        sleep: [],
-      },
-      items: [
-        { _tag: "busy", id: "b1", title: "Part 2", day: "monday", start: 580, end: 700 }, // overlaps
-        { _tag: "event", id: "e1", title: "Part 3", day: "monday", start: 700, end: 800 }, // adjacent
-      ],
-    };
-
-    const spans = getFreeSpans(day);
-    expect(spans).toEqual([
-      { start: 0, end: 500 },
-      { start: 800, end: 1440 },
-    ]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 2. Greedy Placement by Priority
+// 1. Greedy Placement by Priority
 // ---------------------------------------------------------------------------
 
 describe("Greedy Placement by Priority", () => {

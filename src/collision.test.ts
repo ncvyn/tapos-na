@@ -1,19 +1,14 @@
 /**
  * Collision-prevention core unit tests (T10).
  *
- * Pure, deterministic tests for the drag & drop collision seam: interval
- * overlap (wrap-aware for sleep), span math for a dragged item's new time,
- * and `wouldCollide` against a day's effective occupying blocks — the same
- * block model the engine subtracts from the day to find free time, so a
- * refused drop is exactly one that would break scheduling constraints.
+ * Pure, deterministic tests for movement policy: span math for a dragged
+ * item's new time and `wouldCollide` against a day's Week-day occupancy.
  */
 
 import { describe, expect, it } from "vitest";
 import {
   spanForNewStart,
   spanLength,
-  spansOverlap,
-  toIntervals,
   wouldCollide,
 } from "./collision";
 import type { Day } from "./schema";
@@ -27,78 +22,6 @@ function createDay(partial: Partial<Day> = {}): Day {
 }
 
 const BUSY_PLACEMENT = { tag: "busy" as const, start: 540, end: 600 }; // 09:00–10:00
-
-// ---------------------------------------------------------------------------
-// toIntervals
-// ---------------------------------------------------------------------------
-
-describe("toIntervals", () => {
-  it("returns a single interval for a forward span", () => {
-    expect(toIntervals({ start: 540, end: 600 })).toEqual([
-      { start: 540, end: 600 },
-    ]);
-  });
-
-  it("splits a midnight-wrapping span into [start,1440] and [0,end]", () => {
-    expect(toIntervals({ start: 1380, end: 420 })).toEqual([
-      { start: 1380, end: 1440 },
-      { start: 0, end: 420 },
-    ]);
-  });
-
-  it("returns no intervals for a zero-length span", () => {
-    expect(toIntervals({ start: 600, end: 600 })).toEqual([]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// spansOverlap
-// ---------------------------------------------------------------------------
-
-describe("spansOverlap", () => {
-  it("reports overlap for intersecting forward spans", () => {
-    expect(spansOverlap({ start: 540, end: 600 }, { start: 570, end: 660 })).toBe(
-      true,
-    );
-  });
-
-  it("reports overlap for containment", () => {
-    expect(spansOverlap({ start: 500, end: 700 }, { start: 540, end: 600 })).toBe(
-      true,
-    );
-  });
-
-  it("allows back-to-back (touching) spans", () => {
-    expect(spansOverlap({ start: 540, end: 600 }, { start: 600, end: 660 })).toBe(
-      false,
-    );
-  });
-
-  it("rejects disjoint spans", () => {
-    expect(spansOverlap({ start: 540, end: 600 }, { start: 660, end: 720 })).toBe(
-      false,
-    );
-  });
-
-  it("detects a wrapping sleep overlapping a morning forward block", () => {
-    expect(spansOverlap({ start: 1380, end: 420 }, { start: 300, end: 600 })).toBe(
-      true,
-    );
-  });
-
-  it("detects two wrapping spans that share the early-morning tail", () => {
-    expect(spansOverlap({ start: 1380, end: 420 }, { start: 360, end: 780 })).toBe(
-      true,
-    );
-  });
-
-  it("allows a wrapping span ending exactly when a forward block starts", () => {
-    // sleep 23:00→04:00 covers [1380,1440]+[0,240]; busy 04:00→06:00 touches it.
-    expect(spansOverlap({ start: 1380, end: 240 }, { start: 240, end: 360 })).toBe(
-      false,
-    );
-  });
-});
 
 // ---------------------------------------------------------------------------
 // spanLength

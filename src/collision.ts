@@ -3,7 +3,7 @@
  *
  * Decides whether a dragged item can be placed at a proposed time/day without
  * overlapping an existing block. The occupying-block model is exactly the one
- * the engine subtracts from the day to find free time (`expandDay`), so a
+ * the occupancy module supplies to the scheduling engine, so a
  * refused drop is precisely a placement that would break scheduling
  * constraints: "no overlapping blocks".
  *
@@ -15,40 +15,14 @@
  */
 
 import { type Day, type DayItem } from "./schema";
-import { expandDay } from "./engine";
+import {
+  getWeekDayOccupancy,
+  spansOverlap,
+  type Span,
+} from "./occupancy";
 
 /** The draggable day-item kinds (todos are not day-pinned). */
 export type ItemTag = DayItem["_tag"];
-
-/** A time interval in minutes from local midnight (0..1440). */
-export interface Span {
-  start: number;
-  end: number;
-}
-
-/**
- * Decompose a span into non-wrapping intervals within [0,1440]. Wrapping
- * (sleep) spans split at midnight into a tail and a head.
- */
-export function toIntervals(span: Span): Array<{ start: number; end: number }> {
-  if (span.start < span.end) return [span];
-  if (span.start > span.end)
-    return [
-      { start: span.start, end: 1440 },
-      { start: 0, end: span.end },
-    ];
-  return [];
-}
-
-/**
- * Strict interval overlap. Touching at an endpoint is not a collision —
- * back-to-back blocks (a class ending as another starts) are fine.
- */
-export function spansOverlap(a: Span, b: Span): boolean {
-  const ai = toIntervals(a);
-  const bi = toIntervals(b);
-  return ai.some((x) => bi.some((y) => x.start < y.end && y.start < x.end));
-}
 
 /** Duration of a span in minutes, accounting for a midnight wrap. */
 export function spanLength(span: Span): number {
@@ -101,6 +75,8 @@ export function wouldCollide(
   placement: ProposedPlacement,
   movingId?: string,
 ): boolean {
-  const blocks = expandDay(day).filter((b) => b.id !== movingId);
+  const blocks = getWeekDayOccupancy(day).effectiveBlocks.filter(
+    (b) => b.id !== movingId,
+  );
   return blocks.some((b) => spansOverlap(placement, b));
 }

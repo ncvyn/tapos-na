@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { type DayItem, type DayOfWeek } from "../schema";
-import { spanForNewStart, toIntervals } from "../collision";
+import { spanForNewStart } from "../collision";
+import { toIntervals } from "../occupancy";
 import {
   beginDrag,
   commitDropOnDay,

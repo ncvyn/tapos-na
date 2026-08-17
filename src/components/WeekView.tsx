@@ -8,10 +8,10 @@ import {
 } from "../schema";
 import {
   computeSchedule,
-  expandDay,
   type DaySchedule,
   type ScheduledSegment,
 } from "../engine";
+import { getWeekDayOccupancy } from "../occupancy";
 import {
   beginDrag,
   commitDropOnDay,
@@ -76,7 +76,8 @@ export default function WeekView(props: WeekViewProps) {
             const isToday = () => todayWeekday() === day;
             const dayData = () => props.store.doc.days[day];
             const schedule = () => weekSchedule()[day];
-            const dayBlocks = () => (dayData() ? expandDay(dayData()!) : []);
+            const dayBlocks = () =>
+              dayData() ? getWeekDayOccupancy(dayData()!).effectiveBlocks : [];
             const templateBlocks = () =>
               dayBlocks().filter((b) => b.source === "template");
             const overrideBlocks = () =>

@@ -25,37 +25,11 @@ import {
   type Settings,
   type Todo,
 } from "./schema";
+import { getWeekDayOccupancy, type FreeSpan } from "./occupancy";
 
 // ---------------------------------------------------------------------------
 // Engine Types
 // ---------------------------------------------------------------------------
-
-/** A free time interval on a day [start, end] in minutes from midnight (0..1440). */
-export interface FreeSpan {
-  start: number;
-  end: number;
-}
-
-/**
- * Where an effective block came from. `template` = recurring weekly template;
- * `one-off` = a day-pinned item; `override` = a one-off sleep override that
- * replaces that day's template sleep.
- */
-export type BlockSource = "template" | "one-off" | "override";
-
-/**
- * An effective occupying block on a day, after template expansion. Combines
- * the recurring template (busy + sleep), one-off items, and any sleep
- * override so the engine and UI share one view of "what occupies this day".
- */
-export interface EffectiveBlock {
-  _tag: "busy" | "event" | "sleep";
-  id: string;
-  title?: string;
-  start: number;
-  end: number;
-  source: BlockSource;
-}
 
 /** Work segment scheduled for a todo. */
 export interface WorkSegment {
@@ -125,163 +99,6 @@ function isCarriedTodo(tp: TodoProgress): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Free Spans Computation
-// ---------------------------------------------------------------------------
-
-/**
- * Expand a day into its effective occupying blocks: template busy blocks and
- * template sleep windows (or, when a sleep override is present, the override
- * blocks instead), plus the day's one-off items. Deterministic and pure —
- * this is the template→week expansion that feeds both the engine and the UI.
- *
- * Block order: template busy, one-off items (in stored order), then sleep
- * (override blocks if set, otherwise template sleep).
- */
-export function expandDay(day: Day): EffectiveBlock[] {
-  const blocks: EffectiveBlock[] = [];
-
-  for (const block of day.template.busy) {
-    blocks.push({
-      _tag: "busy",
-      id: block.id,
-      title: block.title,
-      start: block.start,
-      end: block.end,
-      source: "template",
-    });
-  }
-
-  for (const item of day.items) {
-    if (item._tag === "busy") {
-      blocks.push({
-        _tag: "busy",
-        id: item.id,
-        title: item.title,
-        start: item.start,
-        end: item.end,
-        source: "one-off",
-      });
-    } else if (item._tag === "event") {
-      blocks.push({
-        _tag: "event",
-        id: item.id,
-        title: item.title,
-        start: item.start,
-        end: item.end,
-        source: "one-off",
-      });
-    } else {
-      blocks.push({
-        _tag: "sleep",
-        id: item.id,
-        start: item.start,
-        end: item.end,
-        source: "one-off",
-      });
-    }
-  }
-
-  if (day.sleepOverride !== undefined) {
-    day.sleepOverride.forEach((block, index) => {
-      blocks.push({
-        _tag: "sleep",
-        id: `override-${index}-${block.start}-${block.end}`,
-        start: block.start,
-        end: block.end,
-        source: "override",
-      });
-    });
-  } else {
-    for (const block of day.template.sleep) {
-      blocks.push({
-        _tag: "sleep",
-        id: block.id,
-        start: block.start,
-        end: block.end,
-        source: "template",
-      });
-    }
-  }
-
-  return blocks;
-}
-
-/**
- * Compute free time spans for a day [0, 1440] by subtracting the effective
- * occupying blocks from `expandDay` (template busy/sleep, one-off items, and
- * any sleep override).
- *
- * - Sleep spans crossing midnight (start > end) cover [start, 1440] and [0, end].
- * - Busy and event blocks block out their [start, end] intervals.
- * - Overlapping/adjacent occupied blocks are merged before inverting.
- */
-export function getFreeSpans(day: Day): FreeSpan[] {
-  const occupied: Array<{ start: number; end: number }> = [];
-
-  for (const block of expandDay(day)) {
-    addOccupiedSpan(occupied, block.start, block.end, block._tag === "sleep");
-  }
-
-  // Clamp to [0, 1440] and filter non-positive spans
-  const clamped: Array<{ start: number; end: number }> = [];
-  for (const span of occupied) {
-    const start = Math.max(0, Math.min(1440, span.start));
-    const end = Math.max(0, Math.min(1440, span.end));
-    if (start < end) {
-      clamped.push({ start, end });
-    }
-  }
-
-  // Sort occupied spans by start asc, end asc
-  clamped.sort((a, b) => a.start - b.start || a.end - b.end);
-
-  // Merge overlapping or contiguous occupied spans
-  const merged: Array<{ start: number; end: number }> = [];
-  for (const span of clamped) {
-    if (merged.length === 0) {
-      merged.push({ ...span });
-    } else {
-      const last = merged[merged.length - 1];
-      if (span.start <= last.end) {
-        last.end = Math.max(last.end, span.end);
-      } else {
-        merged.push({ ...span });
-      }
-    }
-  }
-
-  // Invert merged occupied spans over [0, 1440] to get free spans
-  const freeSpans: FreeSpan[] = [];
-  let cursor = 0;
-  for (const span of merged) {
-    if (span.start > cursor) {
-      freeSpans.push({ start: cursor, end: span.start });
-    }
-    cursor = Math.max(cursor, span.end);
-  }
-  if (cursor < 1440) {
-    freeSpans.push({ start: cursor, end: 1440 });
-  }
-
-  return freeSpans;
-}
-
-function addOccupiedSpan(
-  spans: Array<{ start: number; end: number }>,
-  start: number,
-  end: number,
-  allowMidnightWrap: boolean,
-) {
-  if (allowMidnightWrap && start > end) {
-    // Crosses midnight: cover [start, 1440] and [0, end]
-    spans.push({ start, end: 1440 });
-    spans.push({ start: 0, end });
-  } else if (start < end) {
-    spans.push({ start, end });
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Day & Week Scheduling Core
 // ---------------------------------------------------------------------------
 
@@ -300,7 +117,7 @@ export function computeDaySchedule(
   settings: Settings,
   dayName?: DayOfWeek,
 ): { daySchedule: DaySchedule; updatedTodos: TodoProgress[] } {
-  const freeSpans = getFreeSpans(day);
+  const freeSpans = getWeekDayOccupancy(day).freeSpans;
   const segments: ScheduledSegment[] = [];
 
   // Clone todo progress map

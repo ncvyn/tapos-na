@@ -8,10 +8,10 @@ import {
 } from "../schema";
 import {
   computeSchedule,
-  expandDay,
   type DaySchedule,
   type ScheduledSegment,
 } from "../engine";
+import { getWeekDayOccupancy } from "../occupancy";
 import {
   beginDrag,
   commitDropOnDay,
@@ -53,7 +53,9 @@ export default function DayView(props: DayViewProps) {
     const day = props.store.selectedDay();
     const dayData = props.store.doc.days[day];
     if (!dayData) return [];
-    return expandDay(dayData).filter((b) => b.source !== "one-off");
+    return getWeekDayOccupancy(dayData).effectiveBlocks.filter(
+      (b) => b.source !== "one-off",
+    );
   });
 
   const hasRecurring = createMemo(() => recurringBlocks().length > 0);

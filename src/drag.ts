@@ -8,7 +8,8 @@
  */
 
 import { type DayItem, type DayOfWeek, type Todo } from "./schema";
-import { wouldCollide, type Span } from "./collision";
+import { wouldCollide } from "./collision";
+import type { Span } from "./occupancy";
 import type { CalendarStore } from "./state";
 import { ITEM_ICONS, ITEM_THEMES } from "./components/itemStyles";
 

@@ -17,3 +17,9 @@ One of the seven days of the Week, in fixed storage order (Monday first).
 Used as the discriminator across items, todos, templates, and the per-day
 schedule.
 _Avoid_: weekday (unqualified), "day of week"
+
+**Week-day occupancy**:
+The time occupied on one Week day by its recurring template, one-off items,
+and sleep windows. A sleep override replaces the recurring template sleep for
+that Week day, while one-off sleep remains additive. The unoccupied time is
+available for scheduling todos.
