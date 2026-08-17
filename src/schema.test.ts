@@ -88,7 +88,6 @@ const template = {
 } as const;
 
 const settings = {
-  weekStart: "monday",
   workLength: 25,
   breakLength: 5,
   longBreakLength: 30,
@@ -166,10 +165,6 @@ describe("day template + settings round-trips (identity)", () => {
 
   it("settings with apiKey", () => {
     expectRoundTrip(Settings)({ ...settings, apiKey: "k-secret" });
-  });
-
-  it("settings sunday-first week start", () => {
-    expectRoundTrip(Settings)({ ...settings, weekStart: "sunday" });
   });
 });
 
@@ -337,9 +332,12 @@ describe("corrupt input fails decode with a typed error", () => {
     );
   });
 
-  it("settings: unknown weekStart", () => {
+  it("settings: legacy weekStart key is rejected (week is always Monday-anchored)", () => {
     expectParseError(() =>
-      Schema.decodeUnknownSync(Settings)({ ...settings, weekStart: "friday" }),
+      decodeCalendarDocSync({
+        ...sampleDoc,
+        settings: { ...settings, weekStart: "monday" },
+      }),
     );
   });
 

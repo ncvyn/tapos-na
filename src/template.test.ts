@@ -30,7 +30,6 @@ import {
 } from "./schema";
 
 const settings: Settings = {
-  weekStart: "monday",
   workLength: 25,
   breakLength: 5,
   longBreakLength: 30,

@@ -57,7 +57,6 @@ export function createDefaultDoc(timezone?: string): CalendarDoc {
   return {
     version: 1,
     settings: {
-      weekStart: "monday",
       workLength: 25,
       breakLength: 5,
       longBreakLength: 30,

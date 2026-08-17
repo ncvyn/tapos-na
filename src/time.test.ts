@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   formatTimeSpan,
-  getDisplayDays,
   getTodayWeekday,
   getZonedClockTime,
   minutesToTime,
@@ -107,32 +106,6 @@ describe("Timezone & DST seam", () => {
       expect(formatTimeSpan(540, 585)).toBe("09:00 – 09:45 (45m)");
       // Cross midnight
       expect(formatTimeSpan(1380, 420)).toBe("23:00 – 07:00 (8h)");
-    });
-  });
-
-  describe("getDisplayDays", () => {
-    it("returns Monday-first days", () => {
-      expect(getDisplayDays("monday")).toEqual([
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-        "sunday",
-      ]);
-    });
-
-    it("returns Sunday-first days", () => {
-      expect(getDisplayDays("sunday")).toEqual([
-        "sunday",
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-      ]);
     });
   });
 });

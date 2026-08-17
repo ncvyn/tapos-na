@@ -4,6 +4,7 @@ import {
   type DayItem,
   type DayOfWeek,
   type Todo,
+  WEEKDAY_NAMES,
 } from "../schema";
 import {
   computeSchedule,
@@ -18,7 +19,7 @@ import {
   wouldPayloadCollide,
 } from "../drag";
 import type { CalendarStore } from "../state";
-import { formatTimeSpan, getDisplayDays, getTodayWeekday, minutesToTime } from "../time";
+import { formatTimeSpan, getTodayWeekday, minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES, PRIORITY_BADGES } from "./itemStyles";
 
 interface WeekViewProps {
@@ -30,20 +31,12 @@ interface WeekViewProps {
 }
 
 export default function WeekView(props: WeekViewProps) {
-  const displayDays = createMemo(() => {
-    return getDisplayDays(props.store.doc.settings.weekStart);
-  });
-
   const todayWeekday = createMemo(() => {
     return getTodayWeekday(props.store.doc.settings.timezone);
   });
 
   const weekSchedule = createMemo<Record<DayOfWeek, DaySchedule>>(() => {
     return computeSchedule(props.store.doc);
-  });
-
-  const isSundayFirst = createMemo(() => {
-    return props.store.doc.settings.weekStart === "sunday";
   });
 
   const [dropHighlight, setDropHighlight] = createSignal<DayOfWeek | null>(null);
@@ -78,10 +71,9 @@ export default function WeekView(props: WeekViewProps) {
     <div class="space-y-6">
       {/* Week Grid */}
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-7">
-        <For each={displayDays()}>
-          {(day, index) => {
-            const isSundayFirstEmptyCol = () => isSundayFirst() && index() === 0;
-            const isToday = () => !isSundayFirstEmptyCol() && todayWeekday() === day;
+        <For each={WEEKDAY_NAMES}>
+          {(day) => {
+            const isToday = () => todayWeekday() === day;
             const dayData = () => props.store.doc.days[day];
             const schedule = () => weekSchedule()[day];
             const dayBlocks = () => (dayData() ? expandDay(dayData()!) : []);
@@ -108,15 +100,11 @@ export default function WeekView(props: WeekViewProps) {
                     ? "ring-2 ring-info/50 border-info"
                     : ""
                 }`}
-                {...(!isSundayFirstEmptyCol()
-                  ? {
-                      onDragOver: (e: DragEvent) => handleColumnDragOver(e, day),
-                      onDrop: (e: DragEvent) => handleColumnDrop(e, day),
-                      onDragLeave: () => {
-                        if (dropHighlight() === day) setDropHighlight(null);
-                      },
-                    }
-                  : {})}
+                onDragOver={(e: DragEvent) => handleColumnDragOver(e, day)}
+                onDrop={(e: DragEvent) => handleColumnDrop(e, day)}
+                onDragLeave={() => {
+                  if (dropHighlight() === day) setDropHighlight(null);
+                }}
               >
                 {/* Column Header */}
                 <div
@@ -146,17 +134,15 @@ export default function WeekView(props: WeekViewProps) {
                       </Show>
                     </div>
 
-                    <Show when={!isSundayFirstEmptyCol()}>
-                      <button
-                        type="button"
-                        class="btn btn-ghost btn-xs btn-circle shrink-0"
-                        onClick={() => props.onOpenAddItem(day, "busy")}
-                        title={`Add item to ${day}`}
-                        aria-label={`Add item to ${day}`}
-                      >
-                        +
-                      </button>
-                    </Show>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-xs btn-circle shrink-0"
+                      onClick={() => props.onOpenAddItem(day, "busy")}
+                      title={`Add item to ${day}`}
+                      aria-label={`Add item to ${day}`}
+                    >
+                      +
+                    </button>
                   </div>
                   <div class="text-[10px] text-base-content/60 capitalize truncate">
                     {day}
@@ -165,150 +151,139 @@ export default function WeekView(props: WeekViewProps) {
 
                 {/* Day Content Body */}
                 <div class="p-2.5 flex-1 space-y-3">
-                  {/* Sunday-first notice for column 1 */}
-                  <Show when={isSundayFirstEmptyCol()}>
-                    <div class="py-12 px-2 text-center text-xs text-base-content/40 italic">
-                      Empty in Sunday-first view
-                      <div class="text-[10px] mt-1 opacity-70">
-                        (Stored week is Mon–Sun)
-                      </div>
-                    </div>
-                  </Show>
-
-                  <Show when={!isSundayFirstEmptyCol()}>
-                    {/* Fixed Commitments & Events (template-inherited, override, one-off) */}
-                    <div class="space-y-1.5">
-                      <Show when={templateBlocks().length > 0}>
-                        <div class="space-y-1">
-                          <div class="text-[10px] font-semibold text-base-content/50 uppercase tracking-wider flex items-center gap-1">
-                            <span>⟳ Template</span>
-                            <span class="badge badge-ghost badge-xs text-[9px]">
-                              recurring
-                            </span>
-                          </div>
-                          <For each={templateBlocks()}>
-                            {(block) => {
-                              const theme = ITEM_THEMES[block._tag];
-                              return (
-                                <div
-                                  class={`group relative rounded-md p-1.5 text-xs transition-all cursor-pointer border border-dashed ${theme.card}`}
-                                  onClick={() => props.onOpenTemplate?.(day)}
-                                  title={`Edit ${day} weekly template`}
-                                >
-                                  <div class="font-medium truncate flex items-center gap-1">
-                                    <span>{ITEM_ICONS[block._tag]}</span>
-                                    <span class="truncate">
-                                      {block._tag === "sleep"
-                                        ? theme.name
-                                        : block.title}
-                                    </span>
-                                  </div>
-                                  <div class="text-[10px] opacity-80 font-mono mt-0.5">
-                                    {formatTimeSpan(block.start, block.end)}
-                                  </div>
-                                </div>
-                              );
-                            }}
-                          </For>
+                  {/* Fixed Commitments & Events (template-inherited, override, one-off) */}
+                  <div class="space-y-1.5">
+                    <Show when={templateBlocks().length > 0}>
+                      <div class="space-y-1">
+                        <div class="text-[10px] font-semibold text-base-content/50 uppercase tracking-wider flex items-center gap-1">
+                          <span>⟳ Template</span>
+                          <span class="badge badge-ghost badge-xs text-[9px]">
+                            recurring
+                          </span>
                         </div>
-                      </Show>
-
-                      <Show when={overrideBlocks().length > 0}>
-                        <div class="space-y-1">
-                          <div class="text-[10px] font-semibold text-secondary uppercase tracking-wider flex items-center gap-1">
-                            <span>⏰ Override</span>
-                            <span class="badge badge-secondary badge-xs text-[9px]">
-                              this week
-                            </span>
-                          </div>
-                          <For each={overrideBlocks()}>
-                            {(block) => (
+                        <For each={templateBlocks()}>
+                          {(block) => {
+                            const theme = ITEM_THEMES[block._tag];
+                            return (
                               <div
-                                class={`group relative rounded-md p-1.5 text-xs transition-all cursor-pointer border border-dashed border-secondary ${ITEM_THEMES[block._tag].card}`}
+                                class={`group relative rounded-md p-1.5 text-xs transition-all cursor-pointer border border-dashed ${theme.card}`}
                                 onClick={() => props.onOpenTemplate?.(day)}
-                                title={`Edit ${day} sleep override`}
+                                title={`Edit ${day} weekly template`}
                               >
                                 <div class="font-medium truncate flex items-center gap-1">
                                   <span>{ITEM_ICONS[block._tag]}</span>
                                   <span class="truncate">
-                                    {ITEM_THEMES[block._tag].name}
+                                    {block._tag === "sleep"
+                                      ? theme.name
+                                      : block.title}
                                   </span>
                                 </div>
                                 <div class="text-[10px] opacity-80 font-mono mt-0.5">
                                   {formatTimeSpan(block.start, block.end)}
                                 </div>
                               </div>
-                            )}
-                          </For>
+                            );
+                          }}
+                        </For>
+                      </div>
+                    </Show>
+  
+                    <Show when={overrideBlocks().length > 0}>
+                      <div class="space-y-1">
+                        <div class="text-[10px] font-semibold text-secondary uppercase tracking-wider flex items-center gap-1">
+                          <span>⏰ Override</span>
+                          <span class="badge badge-secondary badge-xs text-[9px]">
+                            this week
+                          </span>
                         </div>
-                      </Show>
-
-                      <Show
-                        when={oneOffItems().length > 0}
-                        fallback={
-                          <Show when={!hasFixed()}>
-                            <div class="py-2 text-center text-[11px] text-base-content/40">
-                              No fixed blocks
+                        <For each={overrideBlocks()}>
+                          {(block) => (
+                            <div
+                              class={`group relative rounded-md p-1.5 text-xs transition-all cursor-pointer border border-dashed border-secondary ${ITEM_THEMES[block._tag].card}`}
+                              onClick={() => props.onOpenTemplate?.(day)}
+                              title={`Edit ${day} sleep override`}
+                            >
+                              <div class="font-medium truncate flex items-center gap-1">
+                                <span>{ITEM_ICONS[block._tag]}</span>
+                                <span class="truncate">
+                                  {ITEM_THEMES[block._tag].name}
+                                </span>
+                              </div>
+                              <div class="text-[10px] opacity-80 font-mono mt-0.5">
+                                {formatTimeSpan(block.start, block.end)}
+                              </div>
                             </div>
-                          </Show>
-                        }
-                      >
-                        <div class="space-y-1">
-                          <div class="text-[10px] font-semibold text-base-content/50 uppercase tracking-wider flex items-center gap-1">
-                            <span>One-off</span>
-                            <span class="badge badge-neutral badge-xs text-[9px]">
-                              this week
-                            </span>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
+  
+                    <Show
+                      when={oneOffItems().length > 0}
+                      fallback={
+                        <Show when={!hasFixed()}>
+                          <div class="py-2 text-center text-[11px] text-base-content/40">
+                            No fixed blocks
                           </div>
-                          <For each={oneOffItems()}>
-                            {(item) => {
-                              const theme = ITEM_THEMES[item._tag];
-                              return (
-                                <div
-                                  class={`group relative rounded-md p-2 text-xs transition-all cursor-grab active:cursor-grabbing border ${theme.card}`}
-                                  draggable
-                                  onDragStart={(e) =>
-                                    beginDrag(e.dataTransfer, {
-                                      kind: "day-item",
-                                      item,
-                                    })
-                                  }
-                                  onClick={() => props.onOpenEditItem(item)}
-                                  title="Drag to another day column to move it (same time)"
-                                >
-                                  <div class="flex items-start justify-between gap-1">
-                                    <div class="font-medium truncate flex items-center gap-1">
-                                      <span>{ITEM_ICONS[item._tag]}</span>
-                                      <span class="truncate">
-                                        {item._tag === "sleep"
-                                          ? theme.name
-                                          : item.title}
-                                      </span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      class="btn btn-ghost btn-xs text-error opacity-0 group-hover:opacity-100 p-0 h-4 min-h-0 w-4"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        props.store.deleteDayItem(day, item.id);
-                                      }}
-                                      title="Delete item"
-                                      aria-label="Delete item"
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                  <div class="text-[10px] opacity-80 font-mono mt-0.5">
-                                    {formatTimeSpan(item.start, item.end)}
-                                  </div>
-                                </div>
-                              );
-                            }}
-                          </For>
+                        </Show>
+                      }
+                    >
+                      <div class="space-y-1">
+                        <div class="text-[10px] font-semibold text-base-content/50 uppercase tracking-wider flex items-center gap-1">
+                          <span>One-off</span>
+                          <span class="badge badge-neutral badge-xs text-[9px]">
+                            this week
+                          </span>
                         </div>
-                      </Show>
-                    </div>
-
+                        <For each={oneOffItems()}>
+                          {(item) => {
+                            const theme = ITEM_THEMES[item._tag];
+                            return (
+                              <div
+                                class={`group relative rounded-md p-2 text-xs transition-all cursor-grab active:cursor-grabbing border ${theme.card}`}
+                                draggable
+                                onDragStart={(e) =>
+                                  beginDrag(e.dataTransfer, {
+                                    kind: "day-item",
+                                    item,
+                                  })
+                                }
+                                onClick={() => props.onOpenEditItem(item)}
+                                title="Drag to another day column to move it (same time)"
+                              >
+                                <div class="flex items-start justify-between gap-1">
+                                  <div class="font-medium truncate flex items-center gap-1">
+                                    <span>{ITEM_ICONS[item._tag]}</span>
+                                    <span class="truncate">
+                                      {item._tag === "sleep"
+                                        ? theme.name
+                                        : item.title}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    class="btn btn-ghost btn-xs text-error opacity-0 group-hover:opacity-100 p-0 h-4 min-h-0 w-4"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      props.store.deleteDayItem(day, item.id);
+                                    }}
+                                    title="Delete item"
+                                    aria-label="Delete item"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                                <div class="text-[10px] opacity-80 font-mono mt-0.5">
+                                  {formatTimeSpan(item.start, item.end)}
+                                </div>
+                              </div>
+                            );
+                          }}
+                        </For>
+                      </div>
+                    </Show>
+                  </div>
+  
                     {/* Derived Pomodoro Bands */}
                     <div class="border-t border-base-200/80 pt-2">
                       <div class="text-[10px] font-semibold text-base-content/60 uppercase tracking-wider mb-1.5 flex items-center justify-between">
@@ -317,7 +292,7 @@ export default function WeekView(props: WeekViewProps) {
                           {schedule()?.segments.filter((s) => s._tag === "work").length ?? 0} 🍅
                         </span>
                       </div>
-
+    
                       <div class="space-y-1">
                         <Show
                           when={
@@ -393,9 +368,8 @@ export default function WeekView(props: WeekViewProps) {
                             )}
                           </For>
                         </Show>
-                      </div>
                     </div>
-                  </Show>
+                  </div>
                 </div>
               </div>
             );

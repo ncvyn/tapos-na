@@ -24,7 +24,6 @@ import {
 // ---------------------------------------------------------------------------
 
 const defaultSettings: Settings = {
-  weekStart: "monday",
   workLength: 25,
   breakLength: 5,
   longBreakLength: 30,

@@ -24,6 +24,11 @@ describe("storage seam", () => {
       const decoded = decodeCalendarDoc(doc);
       expect(decoded._tag).toBe("Right");
     });
+
+    it("produces settings without a weekStart key (week is always Monday-anchored)", () => {
+      const doc = createDefaultDoc("UTC");
+      expect(doc.settings).not.toHaveProperty("weekStart");
+    });
   });
 
   describe("exportDocJson & importDocJson", () => {
@@ -78,7 +83,7 @@ describe("storage seam", () => {
       const invalidDoc = {
         version: 1,
         settings: {
-          weekStart: "invalid-day",
+          timezone: "Mars/Olympus",
         },
       };
       const result = await Effect.runPromiseExit(
@@ -215,6 +220,48 @@ describe("storage seam", () => {
         ),
       );
       expect(Exit.isFailure(result)).toBe(true);
+    });
+
+    it("fails with CorruptDocError when stored doc carries a legacy weekStart key", async () => {
+      const mockStorage = createMockStorage();
+      const legacyDoc = {
+        version: 1,
+        settings: {
+          weekStart: "monday",
+          workLength: 25,
+          breakLength: 5,
+          longBreakLength: 30,
+          miniFocus: true,
+          timezone: "UTC",
+        },
+        days: {
+          monday: { template: { busy: [], sleep: [] }, items: [] },
+          tuesday: { template: { busy: [], sleep: [] }, items: [] },
+          wednesday: { template: { busy: [], sleep: [] }, items: [] },
+          thursday: { template: { busy: [], sleep: [] }, items: [] },
+          friday: { template: { busy: [], sleep: [] }, items: [] },
+          saturday: { template: { busy: [], sleep: [] }, items: [] },
+          sunday: { template: { busy: [], sleep: [] }, items: [] },
+        },
+        todos: [],
+      };
+      mockStorage.setItem("test-key", JSON.stringify(legacyDoc));
+
+      const program = Effect.gen(function* () {
+        const storage = yield* StorageService;
+        return yield* storage.loadDoc();
+      });
+
+      const result = await Effect.runPromiseExit(
+        Effect.provide(
+          program,
+          makeLocalStorageLayer("test-key", mockStorage),
+        ),
+      );
+      expect(Exit.isFailure(result)).toBe(true);
+      if (Exit.isFailure(result)) {
+        expect(JSON.stringify(result.cause)).toContain("CorruptDocError");
+      }
     });
   });
 });

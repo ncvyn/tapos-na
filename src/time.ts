@@ -2,7 +2,7 @@
  * Time and timezone utilities for calendar rendering and DST-aware calculations.
  */
 
-import { type DayOfWeek, WEEKDAY_NAMES } from "./schema";
+import { type DayOfWeek } from "./schema";
 
 const WEEKDAY_INDEX_MAP: Record<string, DayOfWeek> = {
   Monday: "monday",
@@ -272,24 +272,4 @@ function zonedClockFormat(timezone: string, date: Date): string {
   const parts = zonedFormatter(timezone).formatToParts(date);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
   return `${get("hour")}:${get("minute")}:${get("second")}`;
-}
-
-/**
- * Returns weekday names ordered according to user's weekStart setting.
- */
-export function getDisplayDays(
-  weekStart: "monday" | "sunday",
-): readonly DayOfWeek[] {
-  if (weekStart === "sunday") {
-    return [
-      "sunday",
-      "monday",
-      "tuesday",
-      "wednesday",
-      "thursday",
-      "friday",
-      "saturday",
-    ] as const;
-  }
-  return WEEKDAY_NAMES;
 }

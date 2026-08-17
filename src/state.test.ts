@@ -213,10 +213,9 @@ describe("state store & actions seam", () => {
       const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
       await store.load();
 
-      expect(store.doc.settings.weekStart).toBe("monday");
-      store.updateSettings({ weekStart: "sunday", workLength: 30 });
+      expect(store.doc.settings.workLength).toBe(25);
+      store.updateSettings({ workLength: 30 });
 
-      expect(store.doc.settings.weekStart).toBe("sunday");
       expect(store.doc.settings.workLength).toBe(30);
 
       vi.advanceTimersByTime(50);
@@ -229,7 +228,7 @@ describe("state store & actions seam", () => {
           memoryLayer,
         ),
       );
-      expect(persistedDoc.settings.weekStart).toBe("sunday");
+      expect(persistedDoc.settings.workLength).toBe(30);
     });
 
     it("round-trips every settings field (incl. apiKey) through store and storage reload", async () => {
@@ -238,7 +237,6 @@ describe("state store & actions seam", () => {
       await store.load();
 
       store.updateSettings({
-        weekStart: "sunday",
         workLength: 50,
         breakLength: 10,
         longBreakLength: 60,
@@ -247,7 +245,6 @@ describe("state store & actions seam", () => {
       });
 
       expect(store.doc.settings).toMatchObject({
-        weekStart: "sunday",
         workLength: 50,
         breakLength: 10,
         longBreakLength: 60,
@@ -267,7 +264,6 @@ describe("state store & actions seam", () => {
         ),
       );
       expect(persistedDoc.settings).toMatchObject({
-        weekStart: "sunday",
         workLength: 50,
         breakLength: 10,
         longBreakLength: 60,
@@ -502,7 +498,6 @@ describe("state store & actions seam", () => {
       const importedDoc: CalendarDoc = {
         version: 1,
         settings: {
-          weekStart: "sunday",
           workLength: 30,
           breakLength: 10,
           longBreakLength: 60,
@@ -533,7 +528,7 @@ describe("state store & actions seam", () => {
       expect(result.success).toBe(true);
       expect(store.doc.todos).toHaveLength(1);
       expect(store.doc.todos[0].title).toBe("Imported Task");
-      expect(store.doc.settings.weekStart).toBe("sunday");
+      expect(store.doc.settings.workLength).toBe(30);
     });
 
     it("rejects corrupt JSON import, sets errorMessage, and leaves doc untouched", async () => {

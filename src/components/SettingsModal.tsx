@@ -27,7 +27,6 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal(props: SettingsModalProps) {
-  const [weekStart, setWeekStart] = createSignal<"monday" | "sunday">("monday");
   const [timezone, setTimezone] = createSignal("UTC");
   const [workLength, setWorkLength] = createSignal(25);
   const [breakLength, setBreakLength] = createSignal(5);
@@ -39,7 +38,6 @@ export default function SettingsModal(props: SettingsModalProps) {
   createEffect(() => {
     if (!props.isOpen) return;
     const settings = props.store.doc.settings;
-    setWeekStart(settings.weekStart);
     setTimezone(settings.timezone);
     setWorkLength(settings.workLength);
     setBreakLength(settings.breakLength);
@@ -65,7 +63,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 
     const trimmedApiKey = apiKey().trim();
     const updated: Partial<Settings> = {
-      weekStart: weekStart(),
       timezone: tz,
       workLength: Number(workLength()),
       breakLength: Number(breakLength()),
@@ -100,33 +97,6 @@ export default function SettingsModal(props: SettingsModalProps) {
                 <span>{error()}</span>
               </div>
             </Show>
-
-            {/* Week Start */}
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text font-medium">First Day of Week</span>
-              </label>
-              <div class="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  class={`btn btn-sm ${
-                    weekStart() === "monday" ? "btn-primary" : "btn-outline"
-                  }`}
-                  onClick={() => setWeekStart("monday")}
-                >
-                  Monday-First (Default)
-                </button>
-                <button
-                  type="button"
-                  class={`btn btn-sm ${
-                    weekStart() === "sunday" ? "btn-primary" : "btn-outline"
-                  }`}
-                  onClick={() => setWeekStart("sunday")}
-                >
-                  Sunday-First
-                </button>
-              </div>
-            </div>
 
             {/* Timezone */}
             <div class="form-control">

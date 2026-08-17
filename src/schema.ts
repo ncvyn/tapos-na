@@ -219,7 +219,6 @@ export type Day = typeof Day.Type;
  * 30–120) are product sanity ranges — the spec fixes only the step sizes.
  */
 export const Settings = Schema.Struct({
-  weekStart: Schema.Literal("monday", "sunday"),
   workLength: Schema.Int.pipe(Schema.multipleOf(5), Schema.between(5, 90)),
   breakLength: Schema.Int.pipe(Schema.multipleOf(5), Schema.between(5, 90)),
   longBreakLength: Schema.Int.pipe(
