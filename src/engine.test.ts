@@ -298,12 +298,18 @@ describe("Work/Break Lengths & Long Break Cadence", () => {
     );
 
     const breaks = daySchedule.segments.filter((s) => s._tag === "break");
-    const longBreak = breaks.find((b) => b.breakType === "long");
-    expect(longBreak).toBeDefined();
-    expect(longBreak!.end - longBreak!.start).toBe(60); // 60 mins, not 30
+    // Break 4 (after the 4th pomodoro) is the long one, and uses the custom length.
+    expect(breaks).toHaveLength(5);
+    expect(breaks[0].breakType).toBe("short");
+    expect(breaks[1].breakType).toBe("short");
+    expect(breaks[2].breakType).toBe("short");
+    expect(breaks[3]).toMatchObject({
+      breakType: "long",
+      end: breaks[3].start + 60, // 60 mins, not the default 30
+    });
+    expect(breaks[4].breakType).toBe("short");
     // Short breaks still use the default 5-minute length
     expect(breaks[0]).toMatchObject({
-      breakType: "short",
       end: breaks[0].start + defaultSettings.breakLength,
     });
   });

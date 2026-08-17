@@ -63,6 +63,7 @@ export default function SettingsModal(props: SettingsModalProps) {
       return;
     }
 
+    const trimmedApiKey = apiKey().trim();
     const updated: Partial<Settings> = {
       weekStart: weekStart(),
       timezone: tz,
@@ -70,7 +71,7 @@ export default function SettingsModal(props: SettingsModalProps) {
       breakLength: Number(breakLength()),
       longBreakLength: Number(longBreakLength()),
       miniFocus: miniFocus(),
-      apiKey: apiKey().trim() === "" ? undefined : apiKey().trim(),
+      apiKey: trimmedApiKey === "" ? undefined : trimmedApiKey,
     };
 
     props.store.updateSettings(updated);
