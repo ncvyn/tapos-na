@@ -37,12 +37,8 @@ type Mutable<T> = {
   -readonly [P in keyof T]: T[P] extends object ? Mutable<T[P]> : T[P];
 };
 
-export type ViewMode = "week" | "day";
-
 export interface CalendarStoreOptions {
   debounceMs?: number;
-  initialDay?: DayOfWeek;
-  initialViewMode?: ViewMode;
 }
 
 export function createCalendarStore(
@@ -58,12 +54,6 @@ export function createCalendarStore(
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
-  const [selectedDay, setSelectedDay] = createSignal<DayOfWeek>(
-    options.initialDay ?? "monday",
-  );
-  const [viewMode, setViewMode] = createSignal<ViewMode>(
-    options.initialViewMode ?? "week",
-  );
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -386,10 +376,6 @@ export function createCalendarStore(
     isLoaded,
     status,
     errorMessage,
-    selectedDay,
-    setSelectedDay,
-    viewMode,
-    setViewMode,
     load,
     flush,
     addDayItem,

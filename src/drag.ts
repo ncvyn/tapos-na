@@ -9,7 +9,6 @@
 
 import { type DayItem, type DayOfWeek, type Todo } from "./schema";
 import { wouldCollide } from "./collision";
-import type { Span } from "./occupancy";
 import type { CalendarStore } from "./state";
 import { ITEM_ICONS, ITEM_THEMES } from "./components/itemStyles";
 
@@ -74,20 +73,23 @@ export function beginDrag(dt: DataTransfer | null, payload: DragPayload): void {
 }
 
 /**
- * Whether `payload` would collide if placed on `targetDay` at `span` (used by
- * drop targets to advertise `dropEffect` before the drop happens). Todos never
- * collide — they only carry a due date.
+ * Whether `payload` would collide if placed on `targetDay` at its current time
+ * (used by drop targets to advertise `dropEffect` before the drop happens).
+ * Todos never collide — they only carry a due date.
  */
 export function wouldPayloadCollide(
   store: CalendarStore,
   payload: DragPayload,
   targetDay: DayOfWeek,
-  span: Span,
 ): boolean {
   if (payload.kind === "todo") return false;
   return wouldCollide(
     store.doc.days[targetDay],
-    { tag: payload.item._tag, start: span.start, end: span.end },
+    {
+      tag: payload.item._tag,
+      start: payload.item.start,
+      end: payload.item.end,
+    },
     payload.item.id,
   );
 }
@@ -95,15 +97,14 @@ export function wouldPayloadCollide(
 export type MoveResult = { ok: true } | { ok: false; reason: string };
 
 /**
- * The single drop seam. Drop `payload` onto `targetDay` at `span` (explicit
- * grid drop) or at the item's current times (day-tab / column drop). Refuses
- * (no state change) when a day item would overlap an existing block there.
+ * The single drop seam. Drop `payload` onto `targetDay` at the item's current
+ * times (column drop). Refuses (no state change) when a day item would overlap
+ * an existing block there.
  */
 export function commitDropOnDay(
   store: CalendarStore,
   payload: DragPayload,
   targetDay: DayOfWeek,
-  span?: Span,
 ): MoveResult {
   if (payload.kind === "todo") {
     if (payload.item.dueDate === targetDay) return { ok: true };
@@ -112,10 +113,9 @@ export function commitDropOnDay(
   }
 
   const item = payload.item;
-  const target = span ?? { start: item.start, end: item.end };
   const collides = wouldCollide(
     store.doc.days[targetDay],
-    { tag: item._tag, start: target.start, end: target.end },
+    { tag: item._tag, start: item.start, end: item.end },
     item.id,
   );
   if (collides) {
@@ -129,8 +129,6 @@ export function commitDropOnDay(
   store.updateDayItem(item.day, {
     ...item,
     day: targetDay,
-    start: target.start,
-    end: target.end,
   });
   return { ok: true };
 }

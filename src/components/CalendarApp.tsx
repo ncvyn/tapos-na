@@ -1,8 +1,8 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { type DayItem, type DayOfWeek, type Todo } from "../schema";
 import { createCalendarStore } from "../state";
+import { getTodayWeekday } from "../time";
 import ClockBar from "./ClockBar";
-import DayView from "./DayView";
 import ImportModal from "./ImportModal";
 import ItemModal, { type ItemType } from "./ItemModal";
 import SettingsModal from "./SettingsModal";
@@ -44,7 +44,9 @@ export default function CalendarApp() {
 
   const handleOpenAddItem = (day?: DayOfWeek, defaultType?: ItemType) => {
     setItemToEdit(null);
-    setModalDefaultDay(day ?? store.selectedDay());
+    setModalDefaultDay(
+      day ?? getTodayWeekday(store.doc.settings.timezone),
+    );
     setModalDefaultType(defaultType ?? "busy");
     setItemModalOpen(true);
   };
@@ -91,30 +93,6 @@ export default function CalendarApp() {
             <Show when={store.status() === "saved"}>
               <span class="badge badge-xs badge-success">Saved</span>
             </Show>
-          </div>
-        </div>
-
-        {/* Center: Week / Day View Toggle */}
-        <div class="navbar-center">
-          <div class="join">
-            <button
-              type="button"
-              class={`join-item btn btn-sm ${
-                store.viewMode() === "week" ? "btn-primary" : "btn-ghost"
-              }`}
-              onClick={() => store.setViewMode("week")}
-            >
-              Week View
-            </button>
-            <button
-              type="button"
-              class={`join-item btn btn-sm ${
-                store.viewMode() === "day" ? "btn-primary" : "btn-ghost"
-              }`}
-              onClick={() => store.setViewMode("day")}
-            >
-              Day View
-            </button>
           </div>
         </div>
 
@@ -207,25 +185,13 @@ export default function CalendarApp() {
             Loading calendar...
           </div>
         }>
-          <Show when={store.viewMode() === "week"}>
-            <WeekView
-              store={store}
-              onOpenAddItem={(day) => handleOpenAddItem(day)}
-              onOpenEditItem={handleOpenEditItem}
-              onOpenTemplate={handleOpenTemplate}
-              onDropRefused={notifyDropRefused}
-            />
-          </Show>
-
-          <Show when={store.viewMode() === "day"}>
-            <DayView
-              store={store}
-              onOpenAddItem={(day, type) => handleOpenAddItem(day, type)}
-              onOpenEditItem={handleOpenEditItem}
-              onOpenTemplate={handleOpenTemplate}
-              onDropRefused={notifyDropRefused}
-            />
-          </Show>
+          <WeekView
+            store={store}
+            onOpenAddItem={(day, type) => handleOpenAddItem(day, type)}
+            onOpenEditItem={handleOpenEditItem}
+            onOpenTemplate={handleOpenTemplate}
+            onDropRefused={notifyDropRefused}
+          />
         </Show>
       </main>
 

@@ -5,7 +5,12 @@ import {
   WEEKDAY_NAMES,
 } from "../schema";
 import type { CalendarStore } from "../state";
-import { formatTimeSpan, minutesToTime, timeToMinutes } from "../time";
+import {
+  formatTimeSpan,
+  getTodayWeekday,
+  minutesToTime,
+  timeToMinutes,
+} from "../time";
 
 /**
  * Weekly template editor for one day: recurring busy blocks, recurring sleep
@@ -41,7 +46,9 @@ export default function TemplateModal(props: TemplateModalProps) {
 
   createEffect(() => {
     if (!props.isOpen) return;
-    setDay(props.defaultDay ?? props.store.selectedDay());
+    setDay(
+      props.defaultDay ?? getTodayWeekday(props.store.doc.settings.timezone),
+    );
   });
 
   createEffect(() => {

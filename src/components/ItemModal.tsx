@@ -11,7 +11,7 @@ import {
   WEEKDAY_NAMES,
 } from "../schema";
 import type { CalendarStore } from "../state";
-import { minutesToTime, timeToMinutes } from "../time";
+import { getTodayWeekday, minutesToTime, timeToMinutes } from "../time";
 
 export type ItemType = "busy" | "event" | "sleep" | "todo";
 
@@ -72,7 +72,9 @@ export default function ItemModal(props: ItemModalProps) {
       setEditingId(null);
       setOriginalDay(null);
       setItemType(props.defaultType ?? "busy");
-      setDay(props.defaultDay ?? props.store.selectedDay());
+      setDay(
+        props.defaultDay ?? getTodayWeekday(props.store.doc.settings.timezone),
+      );
       setTitle("");
       setStart("09:00");
       setEnd("10:00");

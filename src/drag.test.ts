@@ -26,15 +26,16 @@ describe("commitDropOnDay (day items)", () => {
     vi.useFakeTimers();
   });
 
-  it("moves an item to a clear slot on another day", async () => {
+  it("moves an item to a clear column at its current time", async () => {
     const store = createCalendarStore(makeMemoryStorageLayer());
     await store.load();
     store.addBusy("monday", busy);
 
-    const result = commitDropOnDay(store, { kind: "day-item", item: busy }, "wednesday", {
-      start: 660,
-      end: 720,
-    });
+    const result = commitDropOnDay(
+      store,
+      { kind: "day-item", item: busy },
+      "wednesday",
+    );
 
     expect(result).toEqual({ ok: true });
     expect(store.doc.days.monday.items).toHaveLength(0);
@@ -42,20 +43,9 @@ describe("commitDropOnDay (day items)", () => {
     expect(store.doc.days.wednesday.items[0]).toMatchObject({
       id: "busy-1",
       day: "wednesday",
-      start: 660,
-      end: 720,
+      start: 540,
+      end: 600,
     });
-  });
-
-  it("keeps the item's current time when no span is given", async () => {
-    const store = createCalendarStore(makeMemoryStorageLayer());
-    await store.load();
-    store.addBusy("monday", busy);
-
-    const result = commitDropOnDay(store, { kind: "day-item", item: busy }, "friday");
-
-    expect(result).toEqual({ ok: true });
-    expect(store.doc.days.friday.items[0]).toMatchObject({ start: 540, end: 600 });
   });
 
   it("refuses an overlapping drop and leaves the origin untouched", async () => {
@@ -71,10 +61,11 @@ describe("commitDropOnDay (day items)", () => {
       end: 600,
     });
 
-    const result = commitDropOnDay(store, { kind: "day-item", item: busy }, "tuesday", {
-      start: 550,
-      end: 610,
-    });
+    const result = commitDropOnDay(
+      store,
+      { kind: "day-item", item: busy },
+      "tuesday",
+    );
 
     expect(result).toEqual({ ok: false, reason: expect.stringContaining("refused") });
     // Item stays exactly where it started.
@@ -88,13 +79,14 @@ describe("commitDropOnDay (day items)", () => {
     await store.load();
     store.addBusy("monday", busy);
 
-    const result = commitDropOnDay(store, { kind: "day-item", item: busy }, "monday", {
-      start: 600,
-      end: 660,
-    });
+    const result = commitDropOnDay(
+      store,
+      { kind: "day-item", item: busy },
+      "monday",
+    );
 
     expect(result).toEqual({ ok: true });
-    expect(store.doc.days.monday.items[0]).toMatchObject({ start: 600, end: 660 });
+    expect(store.doc.days.monday.items[0]).toEqual(busy);
   });
 
   it("refuses a sleep drop overlapping a template block", async () => {
@@ -115,10 +107,11 @@ describe("commitDropOnDay (day items)", () => {
       end: 660,
     };
     store.addSleep("tuesday", sleep);
-    const result = commitDropOnDay(store, { kind: "day-item", item: sleep }, "monday", {
-      start: 540,
-      end: 660,
-    });
+    const result = commitDropOnDay(
+      store,
+      { kind: "day-item", item: sleep },
+      "monday",
+    );
 
     expect(result).toEqual({ ok: false, reason: expect.stringContaining("refused") });
     expect(store.doc.days.tuesday.items).toHaveLength(1);

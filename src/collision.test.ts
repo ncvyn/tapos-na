@@ -1,16 +1,12 @@
 /**
  * Collision-prevention core unit tests (T10).
  *
- * Pure, deterministic tests for movement policy: span math for a dragged
- * item's new time and `wouldCollide` against a day's Week-day occupancy.
+ * Pure, deterministic tests for movement policy: `wouldCollide` against a
+ * day's Week-day occupancy.
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  spanForNewStart,
-  spanLength,
-  wouldCollide,
-} from "./collision";
+import { wouldCollide } from "./collision";
 import type { Day } from "./schema";
 
 function createDay(partial: Partial<Day> = {}): Day {
@@ -22,73 +18,6 @@ function createDay(partial: Partial<Day> = {}): Day {
 }
 
 const BUSY_PLACEMENT = { tag: "busy" as const, start: 540, end: 600 }; // 09:00–10:00
-
-// ---------------------------------------------------------------------------
-// spanLength
-// ---------------------------------------------------------------------------
-
-describe("spanLength", () => {
-  it("measures a forward span", () => {
-    expect(spanLength({ start: 540, end: 600 })).toBe(60);
-  });
-
-  it("measures a wrapping span across midnight", () => {
-    expect(spanLength({ start: 1380, end: 420 })).toBe(480);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// spanForNewStart
-// ---------------------------------------------------------------------------
-
-describe("spanForNewStart", () => {
-  it("moves a busy span keeping its duration", () => {
-    expect(spanForNewStart("busy", { start: 540, end: 600 }, 720)).toEqual({
-      start: 720,
-      end: 780,
-    });
-  });
-
-  it("moves an event span keeping its duration", () => {
-    expect(spanForNewStart("event", { start: 540, end: 600 }, 120)).toEqual({
-      start: 120,
-      end: 180,
-    });
-  });
-
-  it("refuses a busy span that would overflow the day", () => {
-    expect(spanForNewStart("busy", { start: 540, end: 600 }, 1410)).toBeNull();
-  });
-
-  it("refuses an event span that would overflow the day", () => {
-    expect(spanForNewStart("event", { start: 540, end: 600 }, 1390)).toBeNull();
-  });
-
-  it("keeps a sleep span's duration when it stays forward", () => {
-    expect(spanForNewStart("sleep", { start: 1380, end: 420 }, 120)).toEqual({
-      start: 120,
-      end: 600,
-    });
-  });
-
-  it("wraps a sleep span that crosses midnight after the move", () => {
-    expect(spanForNewStart("sleep", { start: 600, end: 660 }, 1380)).toEqual({
-      start: 1380,
-      end: 0,
-    });
-  });
-
-  it("keeps a wrapping sleep span wrapping after the move", () => {
-    expect(spanForNewStart("sleep", { start: 1380, end: 420 }, 1380)).toEqual({
-      start: 1380,
-      end: 420,
-    });
-  });
-
-  it("returns null for a zero-length original span", () => {
-    expect(spanForNewStart("busy", { start: 600, end: 600 }, 0)).toBeNull();
-  });
-});
 
 // ---------------------------------------------------------------------------
 // wouldCollide

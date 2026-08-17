@@ -24,7 +24,10 @@ import { ITEM_ICONS, ITEM_THEMES, PRIORITY_BADGES } from "./itemStyles";
 
 interface WeekViewProps {
   store: CalendarStore;
-  onOpenAddItem: (day: DayOfWeek, defaultType?: "busy" | "event" | "sleep" | "todo") => void;
+  onOpenAddItem: (
+    day?: DayOfWeek,
+    defaultType?: "busy" | "event" | "sleep" | "todo",
+  ) => void;
   onOpenEditItem: (item: DayItem | Todo) => void;
   onOpenTemplate?: (day: DayOfWeek) => void;
   onDropRefused?: (reason: string) => void;
@@ -49,10 +52,7 @@ export default function WeekView(props: WeekViewProps) {
     e.preventDefault();
     const collides =
       payload.kind === "day-item" &&
-      wouldPayloadCollide(props.store, payload, day, {
-        start: payload.item.start,
-        end: payload.item.end,
-      });
+      wouldPayloadCollide(props.store, payload, day);
     dt.dropEffect = collides ? "none" : "move";
     if (!collides) setDropHighlight(day);
     else if (dropHighlight() === day) setDropHighlight(null);
@@ -117,17 +117,9 @@ export default function WeekView(props: WeekViewProps) {
                 >
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-1.5 min-w-0">
-                      <button
-                        type="button"
-                        class="text-sm font-bold capitalize hover:underline truncate text-left"
-                        onClick={() => {
-                          props.store.setSelectedDay(day);
-                          props.store.setViewMode("day");
-                        }}
-                        title={`Switch to ${day} day view`}
-                      >
+                      <span class="text-sm font-bold capitalize truncate text-left">
                         {DAY_LABELS[day]}
-                      </button>
+                      </span>
                       <Show when={isToday()}>
                         <span class="badge badge-primary badge-xs uppercase font-bold tracking-wider">
                           Today
@@ -397,7 +389,7 @@ export default function WeekView(props: WeekViewProps) {
             <button
               type="button"
               class="btn btn-sm btn-primary"
-              onClick={() => props.onOpenAddItem(props.store.selectedDay(), "todo")}
+              onClick={() => props.onOpenAddItem(undefined, "todo")}
             >
               + Add Todo
             </button>

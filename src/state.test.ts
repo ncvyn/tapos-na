@@ -273,17 +273,6 @@ describe("state store & actions seam", () => {
     });
   });
 
-  describe("viewMode and navigation", () => {
-    it("supports switching viewMode between week and day", async () => {
-      const memoryLayer = makeMemoryStorageLayer();
-      const store = createCalendarStore(memoryLayer);
-
-      expect(store.viewMode()).toBe("week");
-      store.setViewMode("day");
-      expect(store.viewMode()).toBe("day");
-    });
-  });
-
   describe("weekly template CRUD", () => {
     it("adds, updates, and deletes template busy blocks", async () => {
       const memoryLayer = makeMemoryStorageLayer();
