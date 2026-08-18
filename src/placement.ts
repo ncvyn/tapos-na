@@ -156,3 +156,167 @@ function nearestAlternateStart(
     ? null
     : { start: best.start, end: best.start + duration, adjusted: true };
 }
+
+// ---------------------------------------------------------------------------
+// Resize resolution (#20)
+// ---------------------------------------------------------------------------
+
+/** The edge of a day item being resized. */
+export type ResizeEdge = "start" | "end";
+
+/** The item being resized, as it currently sits on its Week day. */
+export interface ResizeRequest {
+  tag: ItemTag;
+  start: number;
+  end: number;
+  /** The resized item's id — excluded from its own occupancy check. */
+  id?: string;
+}
+
+/** A requested resize: move the active edge to `value`, keep the other fixed. */
+export interface ResizeTarget {
+  edge: ResizeEdge;
+  value: number;
+}
+
+/**
+ * Resolve a resize of a day item. The opposite edge stays fixed; the active
+ * edge is clamped to the first conflicting occupancy boundary rather than
+ * creating an overlap, and any result shorter than 15 minutes is refused
+ * (`null`). Wrapping Sleep resizes preserve the item's start and shorten the
+ * trailing (post-midnight) portion first when required. The source span is
+ * never mutated — the caller applies the resolved span on success.
+ */
+export function resolveResize(
+  day: Day,
+  current: ResizeRequest,
+  target: ResizeTarget,
+  boundaryOccupancy: ReadonlyArray<BoundaryOccupancy> = [],
+): ResolvedPlacement | null {
+  if (current.start > current.end) {
+    return resolveWrappingSleepResize(day, current, target, boundaryOccupancy);
+  }
+  return resolveForwardResize(day, current, target, boundaryOccupancy);
+}
+
+/** Resize a forward (non-wrapping) span: keep one edge, clamp the other. */
+function resolveForwardResize(
+  day: Day,
+  current: ResizeRequest,
+  target: ResizeTarget,
+  boundaryOccupancy: ReadonlyArray<BoundaryOccupancy>,
+): ResolvedPlacement | null {
+  const edge = target.edge;
+  const fixed = edge === "start" ? current.end : current.start;
+  const currentActive = edge === "start" ? current.start : current.end;
+
+  // Growing the span moves the active edge away from the fixed edge.
+  const extending =
+    edge === "start"
+      ? target.value < currentActive
+      : target.value > currentActive;
+
+  const active = extending
+    ? clampActiveEdge(day, current, edge, fixed, currentActive, target.value, boundaryOccupancy)
+    : target.value;
+
+  // A resize that cannot move the active edge at all (it clamps back to the
+  // original edge) is refused rather than persisting an unchanged span.
+  if (extending && active === currentActive) return null;
+
+  const newStart = edge === "start" ? active : fixed;
+  const newEnd = edge === "start" ? fixed : active;
+
+  // A forward span must stay forward and retain at least 15 minutes.
+  if (newEnd <= newStart) return null;
+  if (newEnd - newStart < MIN_PLACEMENT_MINUTES) return null;
+  if (wouldCollide(day, { tag: current.tag, start: newStart, end: newEnd }, current.id, boundaryOccupancy)) {
+    return null;
+  }
+
+  return { start: newStart, end: newEnd, adjusted: active !== target.value };
+}
+
+/**
+ * Clamp the active edge when extending it into occupancy: return the first
+ * value (scanning back toward the known-safe `currentActive`) at which the
+ * span no longer collides — the first conflicting occupancy boundary.
+ */
+function clampActiveEdge(
+  day: Day,
+  current: ResizeRequest,
+  edge: ResizeEdge,
+  fixed: number,
+  currentActive: number,
+  value: number,
+  boundaryOccupancy: ReadonlyArray<BoundaryOccupancy>,
+): number {
+  const step = edge === "start" ? 1 : -1;
+  for (let active = value; ; active += step) {
+    if (edge === "start" && active > currentActive) return currentActive;
+    if (edge === "end" && active < currentActive) return currentActive;
+    const candidate = edge === "start"
+      ? { start: active, end: fixed }
+      : { start: fixed, end: active };
+    if (
+      !wouldCollide(day, { tag: current.tag, ...candidate }, current.id, boundaryOccupancy)
+    ) {
+      return active;
+    }
+  }
+}
+
+/**
+ * Resize a wrapping Sleep span. The start is preserved; only the trailing
+ * (post-midnight) portion is adjustable, clamped to occupancy and shortened
+ * first when required. A start-edge request, a span that stops wrapping, or a
+ * result shorter than 15 minutes is refused (`null`).
+ */
+function resolveWrappingSleepResize(
+  day: Day,
+  current: ResizeRequest,
+  target: ResizeTarget,
+  boundaryOccupancy: ReadonlyArray<BoundaryOccupancy>,
+): ResolvedPlacement | null {
+  if (target.edge !== "end") return null;
+  const start = current.start;
+  const currentEnd = current.end;
+
+  // Must still wrap midnight.
+  if (target.value >= start) return null;
+
+  const extending = target.value > currentEnd;
+  const end = extending
+    ? clampWrappingEnd(day, current, target.value, boundaryOccupancy)
+    : target.value;
+
+  // A wrapping-sleep resize that cannot move the trailing edge at all is
+  // refused rather than persisting an unchanged span.
+  if (extending && end === currentEnd) return null;
+
+  const duration = end - start + 1440;
+  if (duration < MIN_PLACEMENT_MINUTES) return null;
+  if (wouldCollide(day, { tag: current.tag, start, end }, current.id, boundaryOccupancy)) {
+    return null;
+  }
+
+  return { start, end, adjusted: end !== target.value };
+}
+
+/** Clamp the trailing end of a wrapping sleep back to the first clear boundary. */
+function clampWrappingEnd(
+  day: Day,
+  current: ResizeRequest,
+  value: number,
+  boundaryOccupancy: ReadonlyArray<BoundaryOccupancy>,
+): number {
+  const start = current.start;
+  for (let end = value; ; end -= 1) {
+    if (end <= current.end) return current.end;
+    if (
+      !wouldCollide(day, { tag: current.tag, start, end }, current.id, boundaryOccupancy)
+    ) {
+      return end;
+    }
+  }
+}

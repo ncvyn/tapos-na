@@ -33,6 +33,7 @@ import {
   StorageService,
 } from "./storage";
 import { findDayConflict, formatConflict } from "./conflicts";
+import { resolveResize, type ResizeTarget } from "./placement";
 
 type Mutable<T> = {
   -readonly [P in keyof T]: T[P] extends object ? Mutable<T[P]> : T[P];
@@ -185,6 +186,44 @@ export function createCalendarStore(
       doc.days[day].items.filter((item) => item.id !== id),
     );
     scheduleSave();
+  };
+
+  /**
+   * Resize an existing day item on `day` via the shared placement-resolution
+   * seam. The opposite edge stays fixed; the active edge clamps to the first
+   * conflicting occupancy boundary. Refused resizes (shorter than 15 minutes,
+   * or no non-overlapping placement) leave the item unchanged.
+   */
+  const resizeDayItem = (
+    day: DayOfWeek,
+    item: DayItem,
+    target: ResizeTarget,
+  ): boolean => {
+    const resolved = resolveResize(
+      doc.days[day],
+      { tag: item._tag, start: item.start, end: item.end, id: item.id },
+      target,
+      day === "monday" ? doc.boundaryOccupancy : [],
+    );
+    if (resolved === null) {
+      setErrorMessage(
+        "Resize refused — keep at least 15 minutes without overlapping.",
+      );
+      setStatus("error");
+      return false;
+    }
+    setDoc(
+      "days",
+      day,
+      "items",
+      doc.days[day].items.map((existing) =>
+        existing.id === item.id
+          ? { ...existing, start: resolved.start, end: resolved.end }
+          : existing,
+      ),
+    );
+    scheduleSave();
+    return true;
   };
 
   // Busy-specific aliases
@@ -455,6 +494,7 @@ export function createCalendarStore(
     flush,
     addDayItem,
     updateDayItem,
+    resizeDayItem,
     deleteDayItem,
     addBusy,
     updateBusy,

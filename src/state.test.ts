@@ -233,6 +233,146 @@ describe("state store & actions seam", () => {
     });
   });
 
+  describe("resizeDayItem (adjusted resize seam)", () => {
+    it("clamps an extending resize to occupancy and persists debounced", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      const busy: Busy = {
+        _tag: "busy",
+        id: "busy-1",
+        title: "Standup",
+        day: "monday",
+        start: 540,
+        end: 600,
+      };
+      store.addBusy("monday", busy);
+      store.addTemplateBusy("monday", {
+        id: "tb1",
+        title: "Workshop",
+        start: 660,
+        end: 700,
+      });
+
+      // Extending the end to 720 collides with [660,700]; it clamps to 660.
+      const saved = store.resizeDayItem("monday", busy, {
+        edge: "end",
+        value: 720,
+      });
+      expect(saved).toBe(true);
+      expect(store.doc.days.monday.items[0]).toMatchObject({
+        id: "busy-1",
+        start: 540,
+        end: 660,
+      });
+
+      vi.advanceTimersByTime(50);
+      const reloaded = createCalendarStore(memoryLayer);
+      await reloaded.load();
+      expect(reloaded.doc.days.monday.items[0]).toMatchObject({
+        id: "busy-1",
+        start: 540,
+        end: 660,
+      });
+    });
+
+    it("refuses a resize shorter than 15 minutes and leaves the item unchanged", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer);
+      await store.load();
+
+      const busy: Busy = {
+        _tag: "busy",
+        id: "busy-1",
+        title: "Standup",
+        day: "monday",
+        start: 540,
+        end: 600,
+      };
+      store.addBusy("monday", busy);
+
+      const saved = store.resizeDayItem("monday", busy, {
+        edge: "end",
+        value: 550,
+      });
+      expect(saved).toBe(false);
+      expect(store.errorMessage()).toContain("Resize refused");
+      expect(store.doc.days.monday.items[0]).toEqual(busy);
+    });
+
+    it("persists a resized wrapping sleep and survives reload", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      const sleep: Sleep = {
+        _tag: "sleep",
+        id: "sleep-1",
+        day: "monday",
+        start: 1380,
+        end: 420,
+      };
+      store.addSleep("monday", sleep);
+
+      const saved = store.resizeDayItem("monday", sleep, {
+        edge: "end",
+        value: 300,
+      });
+      expect(saved).toBe(true);
+      expect(store.doc.days.monday.items[0]).toMatchObject({
+        id: "sleep-1",
+        start: 1380,
+        end: 300,
+      });
+
+      vi.advanceTimersByTime(50);
+      const reloaded = createCalendarStore(memoryLayer);
+      await reloaded.load();
+      expect(reloaded.doc.days.monday.items[0]).toMatchObject({
+        id: "sleep-1",
+        start: 1380,
+        end: 300,
+      });
+    });
+
+    it("persists a resized event and survives reload", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      const event: CalendarEvent = {
+        _tag: "event",
+        id: "ev-1",
+        title: "Dentist",
+        day: "tuesday",
+        start: 540,
+        end: 600,
+      };
+      store.addEvent("tuesday", event);
+
+      const saved = store.resizeDayItem("tuesday", event, {
+        edge: "end",
+        value: 630,
+      });
+      expect(saved).toBe(true);
+      expect(store.doc.days.tuesday.items[0]).toMatchObject({
+        id: "ev-1",
+        start: 540,
+        end: 630,
+      });
+
+      vi.advanceTimersByTime(50);
+      const reloaded = createCalendarStore(memoryLayer);
+      await reloaded.load();
+      expect(reloaded.doc.days.tuesday.items[0]).toMatchObject({
+        id: "ev-1",
+        start: 540,
+        end: 630,
+      });
+    });
+  });
+
   describe("settings updates", () => {
     it("updates settings optimistically and triggers save", async () => {
       const memoryLayer = makeMemoryStorageLayer();

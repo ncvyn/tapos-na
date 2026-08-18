@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import {
   MIN_PLACEMENT_MINUTES,
   resolvePlacement,
+  resolveResize,
   type RequestedPlacement,
 } from "./placement";
 import type { BoundaryOccupancy, Day } from "./schema";
@@ -252,5 +253,166 @@ describe("resolvePlacement — wrapping sleep", () => {
     // undefined for a wrapping span, so the resolver refuses instead of
     // turning an overnight sleep into a forward day-time block.
     expect(resolvePlacement(day, sleep)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Resize resolution (#20)
+// ---------------------------------------------------------------------------
+
+describe("resolveResize — forward spans, start edge", () => {
+  it("shrinks from the start edge exactly as requested (end fixed, no collision)", () => {
+    const current = { tag: "busy" as const, start: 540, end: 600, id: "b1" };
+    expect(resolveResize(createDay(), current, { edge: "start", value: 570 })).toEqual({
+      start: 570,
+      end: 600,
+      adjusted: false,
+    });
+  });
+
+  it("extends the start edge earlier, clamping at the first occupancy boundary", () => {
+    const day = createDay({
+      template: { busy: [{ id: "tb1", title: "Class", start: 500, end: 520 }], sleep: [] },
+    });
+    const current = { tag: "busy" as const, start: 540, end: 600, id: "b1" };
+    // Requested [480,600] collides with [500,520]; the active start clamps to
+    // the first clear boundary (520) instead of creating an overlap.
+    expect(resolveResize(day, current, { edge: "start", value: 480 })).toEqual({
+      start: 520,
+      end: 600,
+      adjusted: true,
+    });
+  });
+
+  it("refuses a start-edge shrink shorter than 15 minutes", () => {
+    const current = { tag: "busy" as const, start: 540, end: 600, id: "b1" };
+    // [590,600] is only 10 minutes.
+    expect(resolveResize(createDay(), current, { edge: "start", value: 590 })).toBeNull();
+  });
+
+  it("refuses a start-edge change that crosses the fixed end edge", () => {
+    const current = { tag: "busy" as const, start: 540, end: 600, id: "b1" };
+    expect(resolveResize(createDay(), current, { edge: "start", value: 600 })).toBeNull();
+    expect(resolveResize(createDay(), current, { edge: "start", value: 660 })).toBeNull();
+  });
+});
+
+describe("resolveResize — forward spans, end edge", () => {
+  it("shrinks from the end edge exactly as requested (start fixed)", () => {
+    const current = { tag: "event" as const, start: 540, end: 600, id: "e1" };
+    expect(resolveResize(createDay(), current, { edge: "end", value: 570 })).toEqual({
+      start: 540,
+      end: 570,
+      adjusted: false,
+    });
+  });
+
+  it("extends the end edge later, clamping at the first occupancy boundary", () => {
+    const day = createDay({
+      template: { busy: [{ id: "tb1", title: "Class", start: 660, end: 700 }], sleep: [] },
+    });
+    const current = { tag: "busy" as const, start: 540, end: 600, id: "b1" };
+    // Requested [540,720] collides with [660,700]; the active end clamps to
+    // the first clear boundary (660) instead of overlapping.
+    expect(resolveResize(day, current, { edge: "end", value: 720 })).toEqual({
+      start: 540,
+      end: 660,
+      adjusted: true,
+    });
+  });
+
+  it("refuses an end-edge shrink shorter than 15 minutes", () => {
+    const current = { tag: "busy" as const, start: 540, end: 600, id: "b1" };
+    expect(resolveResize(createDay(), current, { edge: "end", value: 550 })).toBeNull();
+  });
+
+  it("refuses an extension clamped entirely back to the original edge", () => {
+    const day = createDay({
+      template: { busy: [{ id: "tb1", title: "Wall", start: 600, end: 1440 }], sleep: [] },
+    });
+    const current = { tag: "busy" as const, start: 540, end: 600, id: "b1" };
+    // Extending the end to 720 can only land back on 600 (blocked immediately);
+    // the resize is refused rather than silently reporting a no-op change.
+    expect(resolveResize(day, current, { edge: "end", value: 720 })).toBeNull();
+  });
+});
+
+describe("resolveResize — wrapping sleep", () => {
+  it("preserves the start and shortens the trailing portion first when extended into occupancy", () => {
+    const day = createDay({
+      template: { busy: [{ id: "tb1", title: "Morning", start: 540, end: 600 }], sleep: [] },
+    });
+    const current = { tag: "sleep" as const, start: 1380, end: 420, id: "s1" };
+    // Waking at 10:00 ([1380,600]) collides with [540,600]; the trailing
+    // portion shortens, clamping the end to 540 while the start (23:00) holds.
+    expect(resolveResize(day, current, { edge: "end", value: 600 })).toEqual({
+      start: 1380,
+      end: 540,
+      adjusted: true,
+    });
+  });
+
+  it("shrinks the trailing portion exactly as requested, preserving the start", () => {
+    const current = { tag: "sleep" as const, start: 1380, end: 420, id: "s1" };
+    expect(resolveResize(createDay(), current, { edge: "end", value: 300 })).toEqual({
+      start: 1380,
+      end: 300,
+      adjusted: false,
+    });
+  });
+
+  it("refuses a wrapping-sleep start-edge resize (start is preserved, not adjustable)", () => {
+    const current = { tag: "sleep" as const, start: 1380, end: 420, id: "s1" };
+    expect(resolveResize(createDay(), current, { edge: "start", value: 1200 })).toBeNull();
+  });
+
+  it("refuses a wrapping-sleep resize that would stop wrapping", () => {
+    const current = { tag: "sleep" as const, start: 1380, end: 420, id: "s1" };
+    // Waking at or after 23:00 no longer wraps midnight.
+    expect(resolveResize(createDay(), current, { edge: "end", value: 1380 })).toBeNull();
+  });
+
+  it("refuses a wrapping-sleep resize shorter than 15 minutes", () => {
+    // Current spans 23:59–00:20 = 21 minutes; shrinking the end to 00:10
+    // leaves only 11 minutes.
+    const current = { tag: "sleep" as const, start: 1439, end: 20, id: "s1" };
+    expect(resolveResize(createDay(), current, { edge: "end", value: 10 })).toBeNull();
+  });
+});
+
+describe("resolveResize — self-exclusion & boundary occupancy", () => {
+  it("excludes the resized item from its own occupancy check", () => {
+    const day = createDay({
+      items: [{ _tag: "busy", id: "b1", title: "Me", day: "monday", start: 540, end: 600 }],
+    });
+    const current = { tag: "busy" as const, start: 540, end: 600, id: "b1" };
+    // Extending the end past the item's own current span must not collide
+    // with the item itself.
+    expect(resolveResize(day, current, { edge: "end", value: 720 })).toEqual({
+      start: 540,
+      end: 720,
+      adjusted: false,
+    });
+  });
+
+  it("treats week-boundary occupancy as participating, read-only occupancy", () => {
+    const boundary: BoundaryOccupancy[] = [{ id: "boundary-1", start: 0, end: 300 }];
+    const day = createDay();
+    const current = { tag: "busy" as const, start: 360, end: 480, id: "b1" };
+    // Extending the start to 240 collides with the boundary [0,300]; the
+    // active start clamps to 300 instead of overlapping, and boundary is not
+    // mutated.
+    expect(resolveResize(day, current, { edge: "start", value: 240 }, boundary)).toEqual({
+      start: 300,
+      end: 480,
+      adjusted: true,
+    });
+    expect(boundary).toEqual([{ id: "boundary-1", start: 0, end: 300 }]);
+  });
+
+  it("leaves the source span unchanged on refusal (pure function)", () => {
+    const current = { tag: "busy" as const, start: 540, end: 600, id: "b1" };
+    resolveResize(createDay(), current, { edge: "start", value: 590 });
+    expect(current).toEqual({ tag: "busy", start: 540, end: 600, id: "b1" });
   });
 });

@@ -144,10 +144,12 @@ export default function ItemModal(props: ItemModalProps) {
           end: endMin,
         };
 
-        const saved =
-          isEdit && originalDay()
-            ? props.store.updateDayItem(originalDay()!, dayItem)
-            : props.store.addDayItem(dayItem);
+        const saved = commitDayItemEdit(
+          targetDay,
+          startMin,
+          endMin,
+          dayItem,
+        );
         if (!saved) {
           setErrorMessage(props.store.errorMessage() ?? "Blocks overlap");
           return;
@@ -166,10 +168,12 @@ export default function ItemModal(props: ItemModalProps) {
           end: endMin,
         };
 
-        const saved =
-          isEdit && originalDay()
-            ? props.store.updateDayItem(originalDay()!, sleepItem)
-            : props.store.addDayItem(sleepItem);
+        const saved = commitDayItemEdit(
+          targetDay,
+          startMin,
+          endMin,
+          sleepItem,
+        );
         if (!saved) {
           setErrorMessage(props.store.errorMessage() ?? "Blocks overlap");
           return;
@@ -178,6 +182,42 @@ export default function ItemModal(props: ItemModalProps) {
     }
 
     props.onClose();
+  };
+
+  /**
+   * Commit an edit of a day item. A same-day edit that changes exactly one
+   * time edge is a resize and runs through the shared placement-resolution
+   * seam (clamps the active edge, refuses spans shorter than 15 minutes).
+   * Anything else — a move to another day, or both edges — uses the plain
+   * add/update path.
+   */
+  const commitDayItemEdit = (
+    targetDay: DayOfWeek,
+    startMin: number,
+    endMin: number,
+    dayItem: DayItem,
+  ): boolean => {
+    const isEdit = editingId() !== null;
+    if (!isEdit || originalDay() === null) return props.store.addDayItem(dayItem);
+
+    const original = props.itemToEdit;
+    const originalStart =
+      original && original._tag !== "todo" ? original.start : null;
+    const originalEnd =
+      original && original._tag !== "todo" ? original.end : null;
+
+    const sameDay = targetDay === originalDay();
+    const startChanged = originalStart !== null && startMin !== originalStart;
+    const endChanged = originalEnd !== null && endMin !== originalEnd;
+    const singleEdgeResize = sameDay && startChanged !== endChanged;
+
+    if (singleEdgeResize) {
+      return props.store.resizeDayItem(originalDay()!, dayItem, {
+        edge: startChanged ? "start" : "end",
+        value: startChanged ? startMin : endMin,
+      });
+    }
+    return props.store.updateDayItem(originalDay()!, dayItem);
   };
 
   return (
