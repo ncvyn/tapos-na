@@ -9,7 +9,7 @@
  */
 
 import { type DayItem, type DayOfWeek, type Todo } from "./schema";
-import { resolvePlacement } from "./placement";
+import { refusalMessage, resolvePlacement } from "./placement";
 import type { CalendarStore } from "./state";
 import { ITEM_ICONS, ITEM_THEMES } from "./components/itemStyles";
 
@@ -114,8 +114,14 @@ export function commitDropOnDay(
   }
 
   const item = payload.item;
-  const ok = store.moveDayItem(item.day, item, targetDay, item.start, item.end);
-  return ok
+  const placed = store.moveDayItem(
+    item.day,
+    item,
+    targetDay,
+    item.start,
+    item.end,
+  );
+  return placed
     ? { ok: true }
-    : { ok: false, reason: `No 15-minute placement on ${targetDay} — move refused.` };
+    : { ok: false, reason: refusalMessage(targetDay) };
 }

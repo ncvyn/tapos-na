@@ -19,11 +19,16 @@
  * Week-boundary occupancy participates as read-only occupancy on Monday.
  */
 
-import type { BoundaryOccupancy, Day } from "./schema";
+import type { BoundaryOccupancy, Day, DayOfWeek } from "./schema";
 import { wouldCollide, type ItemTag } from "./collision";
 
 /** The shortest placement a move resolution will produce. */
 export const MIN_PLACEMENT_MINUTES = 15;
+
+/** The single refusal message surfaced when a day has no valid placement. */
+export function refusalMessage(day: DayOfWeek): string {
+  return `No 15-minute placement on ${day} — move refused.`;
+}
 
 /** A requested move placement: the item's wall-clock span on the target day. */
 export interface RequestedPlacement {

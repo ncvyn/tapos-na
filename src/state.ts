@@ -33,7 +33,12 @@ import {
   StorageService,
 } from "./storage";
 import { findDayConflict, formatConflict } from "./conflicts";
-import { resolvePlacement, resolveResize, type ResizeTarget } from "./placement";
+import {
+  refusalMessage,
+  resolvePlacement,
+  resolveResize,
+  type ResizeTarget,
+} from "./placement";
 
 type Mutable<T> = {
   -readonly [P in keyof T]: T[P] extends object ? Mutable<T[P]> : T[P];
@@ -199,7 +204,7 @@ export function createCalendarStore(
       targetDay === "monday" ? doc.boundaryOccupancy : [],
     );
     if (resolved === null) {
-      setErrorMessage(`No 15-minute placement on ${targetDay} — move refused.`);
+      setErrorMessage(refusalMessage(targetDay));
       setStatus("error");
       return false;
     }
