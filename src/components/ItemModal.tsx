@@ -211,8 +211,8 @@ export default function ItemModal(props: ItemModalProps) {
     const endChanged = originalEnd !== null && endMin !== originalEnd;
     const singleEdgeResize = sameDay && startChanged !== endChanged;
 
-    if (singleEdgeResize) {
-      return props.store.resizeDayItem(originalDay()!, dayItem, {
+    if (singleEdgeResize && original && original._tag !== "todo") {
+      return props.store.resizeDayItem(originalDay()!, original, {
         edge: startChanged ? "start" : "end",
         value: startChanged ? startMin : endMin,
       });
