@@ -16,7 +16,7 @@ import {
   beginDrag,
   commitDropOnDay,
   getDragPayload,
-  wouldPayloadCollide,
+  wouldDropBeRefused,
 } from "../drag";
 import type { CalendarStore } from "../state";
 import { formatTimeSpan, getTodayWeekday, minutesToTime } from "../time";
@@ -50,11 +50,11 @@ export default function WeekView(props: WeekViewProps) {
     const payload = getDragPayload(dt);
     if (!payload) return;
     e.preventDefault();
-    const collides =
+    const refused =
       payload.kind === "day-item" &&
-      wouldPayloadCollide(props.store, payload, day);
-    dt.dropEffect = collides ? "none" : "move";
-    if (!collides) setDropHighlight(day);
+      wouldDropBeRefused(props.store, payload, day);
+    dt.dropEffect = refused ? "none" : "move";
+    if (!refused) setDropHighlight(day);
     else if (dropHighlight() === day) setDropHighlight(null);
   };
 

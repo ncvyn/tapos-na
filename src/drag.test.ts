@@ -1,9 +1,10 @@
 /**
- * Drag & drop glue unit tests (T10).
+ * Drag & drop glue unit tests (T10, adjusted moves — #19).
  *
- * Covers the commit seam every drop target uses: a refused drop leaves the
- * document untouched (item returns to its origin), a clean drop moves the
- * item to the target day/time, and todo drops set the due date.
+ * Covers the commit seam every drop target uses: an adjusted drop moves the
+ * item to a resolved placement and persists it, a refused drop leaves the
+ * document untouched (item returns to its origin), and todo drops set the due
+ * date.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,7 +27,7 @@ describe("commitDropOnDay (day items)", () => {
     vi.useFakeTimers();
   });
 
-  it("moves an item to a clear column at its current time", async () => {
+  it("moves an item to a clear column, preserving its wall-clock span", async () => {
     const store = createCalendarStore(makeMemoryStorageLayer());
     await store.load();
     store.addBusy("monday", busy);
@@ -48,7 +49,33 @@ describe("commitDropOnDay (day items)", () => {
     });
   });
 
-  it("refuses an overlapping drop and leaves the origin untouched", async () => {
+  it("shortens an item from its requested start when it collides", async () => {
+    const store = createCalendarStore(makeMemoryStorageLayer());
+    await store.load();
+    store.addBusy("monday", busy);
+    store.addTemplateBusy("tuesday", {
+      id: "tb1",
+      title: "Class",
+      start: 540,
+      end: 570,
+    });
+
+    const result = commitDropOnDay(
+      store,
+      { kind: "day-item", item: busy },
+      "tuesday",
+    );
+
+    expect(result).toEqual({ ok: true });
+    expect(store.doc.days.tuesday.items[0]).toMatchObject({
+      id: "busy-1",
+      day: "tuesday",
+      start: 570,
+      end: 600,
+    });
+  });
+
+  it("adjusts to the nearest alternate start when shortening can't keep 15min", async () => {
     const store = createCalendarStore(makeMemoryStorageLayer());
     await store.load();
     store.addBusy("monday", busy);
@@ -67,8 +94,39 @@ describe("commitDropOnDay (day items)", () => {
       "tuesday",
     );
 
+    // [540,600] is fully occupied; the nearest 60-min gap is [600,660]
+    // (tie with [480,540], later candidate wins).
+    expect(result).toEqual({ ok: true });
+    expect(store.doc.days.tuesday.items).toHaveLength(2);
+    expect(store.doc.days.tuesday.items[1]).toMatchObject({
+      id: "busy-1",
+      day: "tuesday",
+      start: 600,
+      end: 660,
+    });
+  });
+
+  it("refuses a drop with no valid placement and leaves the origin unchanged", async () => {
+    const store = createCalendarStore(makeMemoryStorageLayer());
+    await store.load();
+    store.addBusy("monday", busy);
+    store.addBusy("tuesday", {
+      _tag: "busy",
+      id: "wall",
+      title: "Full Day",
+      day: "tuesday",
+      start: 0,
+      end: 1440,
+    });
+
+    const result = commitDropOnDay(
+      store,
+      { kind: "day-item", item: busy },
+      "tuesday",
+    );
+
     expect(result).toEqual({ ok: false, reason: expect.stringContaining("refused") });
-    // Item stays exactly where it started.
+    // Item stays exactly where it started, with its prior span intact.
     expect(store.doc.days.monday.items).toHaveLength(1);
     expect(store.doc.days.monday.items[0]).toEqual(busy);
     expect(store.doc.days.tuesday.items).toHaveLength(1);
@@ -89,7 +147,7 @@ describe("commitDropOnDay (day items)", () => {
     expect(store.doc.days.monday.items[0]).toEqual(busy);
   });
 
-  it("refuses a sleep drop overlapping a template block", async () => {
+  it("adjusts a sleep drop that overlaps a template block", async () => {
     const store = createCalendarStore(makeMemoryStorageLayer());
     await store.load();
     store.addTemplateBusy("monday", {
@@ -113,8 +171,47 @@ describe("commitDropOnDay (day items)", () => {
       "monday",
     );
 
-    expect(result).toEqual({ ok: false, reason: expect.stringContaining("refused") });
-    expect(store.doc.days.tuesday.items).toHaveLength(1);
+    // [480,720] is occupied; the nearest 120-min gap is [720,840]
+    // (tie with [360,480], later candidate wins).
+    expect(result).toEqual({ ok: true });
+    expect(store.doc.days.monday.items[0]).toMatchObject({
+      id: "s1",
+      day: "monday",
+      start: 720,
+      end: 840,
+    });
+    expect(store.doc.days.tuesday.items).toHaveLength(0);
+  });
+
+  it("persists an adjusted move and it survives a reload", async () => {
+    const memoryLayer = makeMemoryStorageLayer();
+    const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+    await store.load();
+    store.addBusy("monday", busy);
+    store.addBusy("tuesday", {
+      _tag: "busy",
+      id: "busy-2",
+      title: "Work Shift",
+      day: "tuesday",
+      start: 540,
+      end: 600,
+    });
+
+    const result = commitDropOnDay(
+      store,
+      { kind: "day-item", item: busy },
+      "tuesday",
+    );
+    expect(result).toEqual({ ok: true });
+
+    vi.advanceTimersByTime(50);
+
+    // Reload from the same storage layer as a fresh store.
+    const reloaded = createCalendarStore(memoryLayer);
+    await reloaded.load();
+    const moved = reloaded.doc.days.tuesday.items.find((i) => i.id === "busy-1");
+    expect(moved).toMatchObject({ day: "tuesday", start: 600, end: 660 });
+    expect(reloaded.doc.days.monday.items).toHaveLength(0);
   });
 });
 

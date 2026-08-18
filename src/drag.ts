@@ -1,14 +1,15 @@
 /**
- * Drag & drop glue (T10).
+ * Drag & drop glue (T10, adjusted moves — #19).
  *
  * Shared serialization of the in-flight drag payload, a drag-image ghost for
  * HTML5 DnD, and the one commit seam every drop target uses. Committing a move
- * runs the collision check (`wouldCollide`) once, at drop time, so a refused
- * drop leaves the document untouched and the item returns to its origin.
+ * runs the shared placement resolver (`resolvePlacement`) once, at drop time,
+ * so an adjusted or refused drop leaves the document untouched unless a valid
+ * placement is committed.
  */
 
 import { type DayItem, type DayOfWeek, type Todo } from "./schema";
-import { wouldCollide } from "./collision";
+import { resolvePlacement } from "./placement";
 import type { CalendarStore } from "./state";
 import { ITEM_ICONS, ITEM_THEMES } from "./components/itemStyles";
 
@@ -73,25 +74,23 @@ export function beginDrag(dt: DataTransfer | null, payload: DragPayload): void {
 }
 
 /**
- * Whether `payload` would collide if placed on `targetDay` at its current time
- * (used by drop targets to advertise `dropEffect` before the drop happens).
- * Todos never collide — they only carry a due date.
+ * Whether a drop of `payload` onto `targetDay` would be refused (no valid
+ * placement exists). Used by drop targets to advertise `dropEffect` before the
+ * drop happens. Todos never refuse — they only carry a due date.
  */
-export function wouldPayloadCollide(
+export function wouldDropBeRefused(
   store: CalendarStore,
   payload: DragPayload,
   targetDay: DayOfWeek,
 ): boolean {
   if (payload.kind === "todo") return false;
-  return wouldCollide(
-    store.doc.days[targetDay],
-    {
-      tag: payload.item._tag,
-      start: payload.item.start,
-      end: payload.item.end,
-    },
-    payload.item.id,
-    targetDay === "monday" ? store.doc.boundaryOccupancy : [],
+  return (
+    resolvePlacement(
+      store.doc.days[targetDay],
+      { tag: payload.item._tag, start: payload.item.start, end: payload.item.end },
+      payload.item.id,
+      targetDay === "monday" ? store.doc.boundaryOccupancy : [],
+    ) === null
   );
 }
 
@@ -99,8 +98,9 @@ export type MoveResult = { ok: true } | { ok: false; reason: string };
 
 /**
  * The single drop seam. Drop `payload` onto `targetDay` at the item's current
- * times (column drop). Refuses (no state change) when a day item would overlap
- * an existing block there.
+ * wall-clock span (column drop). Resolves the least-surprising valid placement
+ * via the shared resolver — exact when possible, else shortened or moved to a
+ * nearby gap. Refuses (no state change) when no 15-minute placement exists.
  */
 export function commitDropOnDay(
   store: CalendarStore,
@@ -114,23 +114,23 @@ export function commitDropOnDay(
   }
 
   const item = payload.item;
-  const collides = wouldCollide(
+  const resolved = resolvePlacement(
     store.doc.days[targetDay],
     { tag: item._tag, start: item.start, end: item.end },
     item.id,
     targetDay === "monday" ? store.doc.boundaryOccupancy : [],
   );
-  if (collides) {
+  if (resolved === null) {
     return {
       ok: false,
-      reason: `Overlapping drop refused — ${
-        "title" in item ? `${item.title} ` : ""
-      }would overlap a block on ${targetDay}.`,
+      reason: `No 15-minute placement on ${targetDay} — move refused.`,
     };
   }
   store.updateDayItem(item.day, {
     ...item,
     day: targetDay,
+    start: resolved.start,
+    end: resolved.end,
   });
   return { ok: true };
 }
