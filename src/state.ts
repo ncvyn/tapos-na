@@ -33,7 +33,7 @@ import {
   StorageService,
 } from "./storage";
 import { findDayConflict, formatConflict } from "./conflicts";
-import { resolveResize, type ResizeTarget } from "./placement";
+import { resolvePlacement, resolveResize, type ResizeTarget } from "./placement";
 
 type Mutable<T> = {
   -readonly [P in keyof T]: T[P] extends object ? Mutable<T[P]> : T[P];
@@ -176,6 +176,39 @@ export function createCalendarStore(
     }
     scheduleSave();
     return true;
+  };
+
+  /**
+   * Move a day item to `targetDay` via the shared placement-resolution seam
+   * (#14). Resolves the requested wall-clock span on the target day — adjusting
+   * on collision or refusing when no 15-minute placement exists — then commits
+   * through the plain update path. The moving item is excluded from its own
+   * occupancy check, including within-day moves.
+   */
+  const moveDayItem = (
+    originalDay: DayOfWeek,
+    item: DayItem,
+    targetDay: DayOfWeek,
+    start: number,
+    end: number,
+  ): boolean => {
+    const resolved = resolvePlacement(
+      doc.days[targetDay],
+      { tag: item._tag, start, end },
+      item.id,
+      targetDay === "monday" ? doc.boundaryOccupancy : [],
+    );
+    if (resolved === null) {
+      setErrorMessage(`No 15-minute placement on ${targetDay} — move refused.`);
+      setStatus("error");
+      return false;
+    }
+    return updateDayItem(originalDay, {
+      ...item,
+      day: targetDay,
+      start: resolved.start,
+      end: resolved.end,
+    });
   };
 
   const deleteDayItem = (day: DayOfWeek, id: string) => {
@@ -494,6 +527,7 @@ export function createCalendarStore(
     flush,
     addDayItem,
     updateDayItem,
+    moveDayItem,
     resizeDayItem,
     deleteDayItem,
     addBusy,

@@ -233,6 +233,121 @@ describe("state store & actions seam", () => {
     });
   });
 
+  describe("moveDayItem (adjusted move seam)", () => {
+    it("moves cross-day preserving the wall-clock span when it fits", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      const busy: Busy = {
+        _tag: "busy",
+        id: "busy-1",
+        title: "Lab",
+        day: "monday",
+        start: 540,
+        end: 600,
+      };
+      store.addBusy("monday", busy);
+
+      const ok = store.moveDayItem("monday", busy, "tuesday", 540, 600);
+      expect(ok).toBe(true);
+      expect(store.doc.days.monday.items).toHaveLength(0);
+      expect(store.doc.days.tuesday.items[0]).toMatchObject({
+        id: "busy-1",
+        start: 540,
+        end: 600,
+      });
+    });
+
+    it("adjusts a colliding move via the shared resolver and excludes the mover", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      const busy: Busy = {
+        _tag: "busy",
+        id: "busy-1",
+        title: "Lab",
+        day: "monday",
+        start: 540,
+        end: 600,
+      };
+      store.addBusy("monday", busy);
+      // Occupies the start region of the requested span on Tuesday.
+      store.addTemplateBusy("tuesday", {
+        id: "tb1",
+        title: "Workshop",
+        start: 540,
+        end: 570,
+      });
+
+      // The exact placement collides; the resolver shortens from the start,
+      // keeping the end fixed at 600 and clearing the occupant at 570.
+      const ok = store.moveDayItem("monday", busy, "tuesday", 540, 600);
+      expect(ok).toBe(true);
+      expect(store.doc.days.tuesday.items[0]).toMatchObject({
+        id: "busy-1",
+        start: 570,
+        end: 600,
+      });
+    });
+
+    it("refuses a move when no 15-minute placement exists and leaves source unchanged", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      const busy: Busy = {
+        _tag: "busy",
+        id: "busy-1",
+        title: "Lab",
+        day: "monday",
+        start: 540,
+        end: 600,
+      };
+      store.addBusy("monday", busy);
+      // Fill all of Tuesday so no 15-minute gap remains.
+      for (let m = 0; m < 1440; m += 15) {
+        store.addTemplateBusy("tuesday", {
+          id: `tb-${m}`,
+          title: "Block",
+          start: m,
+          end: m + 15,
+        });
+      }
+
+      const ok = store.moveDayItem("monday", busy, "tuesday", 540, 600);
+      expect(ok).toBe(false);
+      expect(store.doc.days.monday.items).toHaveLength(1);
+      expect(store.doc.days.tuesday.items.filter((i) => i.id === "busy-1")).toHaveLength(0);
+    });
+
+    it("resolves a same-day both-edge edit through the seam", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      const busy: Busy = {
+        _tag: "busy",
+        id: "busy-1",
+        title: "Lab",
+        day: "monday",
+        start: 540,
+        end: 600,
+      };
+      store.addBusy("monday", busy);
+
+      // Both edges move onto a gap; the span is preserved (no collision).
+      const ok = store.moveDayItem("monday", busy, "monday", 900, 960);
+      expect(ok).toBe(true);
+      expect(store.doc.days.monday.items[0]).toMatchObject({
+        id: "busy-1",
+        start: 900,
+        end: 960,
+      });
+    });
+  });
+
   describe("resizeDayItem (adjusted resize seam)", () => {
     it("clamps an extending resize to occupancy and persists debounced", async () => {
       const memoryLayer = makeMemoryStorageLayer();

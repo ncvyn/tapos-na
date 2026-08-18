@@ -114,23 +114,8 @@ export function commitDropOnDay(
   }
 
   const item = payload.item;
-  const resolved = resolvePlacement(
-    store.doc.days[targetDay],
-    { tag: item._tag, start: item.start, end: item.end },
-    item.id,
-    targetDay === "monday" ? store.doc.boundaryOccupancy : [],
-  );
-  if (resolved === null) {
-    return {
-      ok: false,
-      reason: `No 15-minute placement on ${targetDay} — move refused.`,
-    };
-  }
-  store.updateDayItem(item.day, {
-    ...item,
-    day: targetDay,
-    start: resolved.start,
-    end: resolved.end,
-  });
-  return { ok: true };
+  const ok = store.moveDayItem(item.day, item, targetDay, item.start, item.end);
+  return ok
+    ? { ok: true }
+    : { ok: false, reason: `No 15-minute placement on ${targetDay} — move refused.` };
 }

@@ -188,8 +188,9 @@ export default function ItemModal(props: ItemModalProps) {
    * Commit an edit of a day item. A same-day edit that changes exactly one
    * time edge is a resize and runs through the shared placement-resolution
    * seam (clamps the active edge, refuses spans shorter than 15 minutes).
-   * Anything else — a move to another day, or both edges — uses the plain
-   * add/update path.
+   * Anything else — a move to another day, or both edges changed — resolves
+   * through the shared move seam (adjusts on collision, refuses when no
+   * 15-minute placement exists).
    */
   const commitDayItemEdit = (
     targetDay: DayOfWeek,
@@ -217,7 +218,13 @@ export default function ItemModal(props: ItemModalProps) {
         value: startChanged ? startMin : endMin,
       });
     }
-    return props.store.updateDayItem(originalDay()!, dayItem);
+    return props.store.moveDayItem(
+      originalDay()!,
+      dayItem,
+      targetDay,
+      startMin,
+      endMin,
+    );
   };
 
   return (
