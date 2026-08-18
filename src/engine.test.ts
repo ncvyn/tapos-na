@@ -42,6 +42,8 @@ function createEmptyDay(): Day {
 function createSampleDoc(): CalendarDoc {
   return {
     version: 1,
+    weekStart: "2026-08-10",
+    boundaryOccupancy: [],
     settings: defaultSettings,
     days: {
       monday: createEmptyDay(),

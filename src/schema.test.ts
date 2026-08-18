@@ -99,6 +99,8 @@ const emptyDay = { template: { busy: [], sleep: [] }, items: [] } as const;
 
 const sampleDoc = {
   version: 1,
+  weekStart: "2026-08-17",
+  boundaryOccupancy: [],
   settings: { ...settings, apiKey: "k-secret" },
   days: {
     monday: {
@@ -176,6 +178,8 @@ describe("CalendarDoc round-trip (identity)", () => {
   it("encode(decode(x)) === x for a doc without optional fields", () => {
     const minimal = {
       version: 1,
+      weekStart: "2026-08-17",
+      boundaryOccupancy: [],
       settings,
       days: {
         monday: emptyDay,

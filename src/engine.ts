@@ -18,6 +18,7 @@
 
 import {
   WEEKDAY_NAMES,
+  type BoundaryOccupancy,
   type CalendarDoc,
   type Day,
   type DayOfWeek,
@@ -116,8 +117,9 @@ export function computeDaySchedule(
   todos: TodoProgress[],
   settings: Settings,
   dayName?: DayOfWeek,
+  boundaryOccupancy: ReadonlyArray<BoundaryOccupancy> = [],
 ): { daySchedule: DaySchedule; updatedTodos: TodoProgress[] } {
-  const freeSpans = getWeekDayOccupancy(day).freeSpans;
+  const freeSpans = getWeekDayOccupancy(day, boundaryOccupancy).freeSpans;
   const segments: ScheduledSegment[] = [];
 
   // Clone todo progress map
@@ -273,6 +275,7 @@ export function computeSchedule(
       todoProgress,
       doc.settings,
       dayName,
+      dayName === "monday" ? doc.boundaryOccupancy : [],
     );
 
     result[dayName] = daySchedule;

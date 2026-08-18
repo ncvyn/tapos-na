@@ -77,7 +77,14 @@ export default function WeekView(props: WeekViewProps) {
             const dayData = () => props.store.doc.days[day];
             const schedule = () => weekSchedule()[day];
             const dayBlocks = () =>
-              dayData() ? getWeekDayOccupancy(dayData()!).effectiveBlocks : [];
+              dayData()
+                ? getWeekDayOccupancy(
+                    dayData()!,
+                    day === "monday" ? props.store.doc.boundaryOccupancy : [],
+                  ).effectiveBlocks
+                : [];
+            const boundaryBlocks = () =>
+              dayBlocks().filter((b) => b.source === "boundary");
             const templateBlocks = () =>
               dayBlocks().filter((b) => b.source === "template");
             const overrideBlocks = () =>
@@ -85,10 +92,11 @@ export default function WeekView(props: WeekViewProps) {
             const oneOffItems = () =>
               [...(dayData()?.items ?? [])].sort((a, b) => a.start - b.start);
             const hasFixed = () =>
-              templateBlocks().length +
+              boundaryBlocks().length +
+                templateBlocks().length +
                 overrideBlocks().length +
                 oneOffItems().length >
-              0;
+                0;
 
             return (
               <div
@@ -142,11 +150,37 @@ export default function WeekView(props: WeekViewProps) {
                   </div>
                 </div>
 
-                {/* Day Content Body */}
-                <div class="p-2.5 flex-1 space-y-3">
-                  {/* Fixed Commitments & Events (template-inherited, override, one-off) */}
-                  <div class="space-y-1.5">
-                    <Show when={templateBlocks().length > 0}>
+                 {/* Day Content Body */}
+                 <div class="p-2.5 flex-1 space-y-3">
+                   {/* Fixed Commitments & Events (template-inherited, override, one-off) */}
+                   <div class="space-y-1.5">
+                     <Show when={boundaryBlocks().length > 0}>
+                       <div class="space-y-1">
+                         <div class="text-[10px] font-semibold text-info uppercase tracking-wider flex items-center gap-1">
+                           <span>↪ Week boundary</span>
+                           <span class="badge badge-info badge-xs text-[9px]">
+                             read-only
+                           </span>
+                         </div>
+                         <For each={boundaryBlocks()}>
+                           {(block) => (
+                             <div
+                               class={`rounded-md p-1.5 text-xs border border-dashed border-info ${ITEM_THEMES.sleep.card}`}
+                               title="Sleep continuation from the preceding Week"
+                             >
+                               <div class="font-medium truncate flex items-center gap-1">
+                                 <span>{ITEM_ICONS.sleep}</span>
+                                 <span class="truncate">Sleep continuation</span>
+                               </div>
+                               <div class="text-[10px] opacity-80 font-mono mt-0.5">
+                                 {formatTimeSpan(block.start, block.end)}
+                               </div>
+                             </div>
+                           )}
+                         </For>
+                       </div>
+                     </Show>
+                     <Show when={templateBlocks().length > 0}>
                       <div class="space-y-1">
                         <div class="text-[10px] font-semibold text-base-content/50 uppercase tracking-wider flex items-center gap-1">
                           <span>⟳ Template</span>

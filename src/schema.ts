@@ -33,6 +33,26 @@ export const WEEKDAY_NAMES = [
 export const DayOfWeek = Schema.Literal(...WEEKDAY_NAMES);
 export type DayOfWeek = typeof DayOfWeek.Type;
 
+/** Canonical local date identifying the Monday of a Week. */
+export const WeekIdentity = Schema.String.pipe(
+  Schema.filter(
+    (value) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const date = new Date(`${value}T00:00:00.000Z`);
+      return (
+        !Number.isNaN(date.getTime()) &&
+        date.toISOString().slice(0, 10) === value &&
+        date.getUTCDay() === 1
+      );
+    },
+    {
+      message: () =>
+        "must be a real Monday in canonical YYYY-MM-DD format",
+    },
+  ),
+);
+export type WeekIdentity = typeof WeekIdentity.Type;
+
 /** Short 3-letter labels for day-of-week display. */
 export const DAY_LABELS: Record<DayOfWeek, string> = {
   monday: "Mon",
@@ -189,6 +209,18 @@ export const SleepBlock = Schema.Struct({
 }).pipe(nonZeroSpan);
 export type SleepBlock = typeof SleepBlock.Type;
 
+/** Read-only sleep continuation carried into Monday from the preceding Week. */
+export const BoundaryOccupancy = Schema.Struct({
+  id: Schema.String,
+  start: Schema.Literal(0),
+  end: DayTime.pipe(
+    Schema.filter((end) => end > 0, {
+      message: () => "boundary occupancy must end after midnight",
+    }),
+  ),
+});
+export type BoundaryOccupancy = typeof BoundaryOccupancy.Type;
+
 /** A day's recurring commitments: busy blocks and sleep windows. */
 export const DayTemplate = Schema.Struct({
   busy: Schema.Array(TemplateBusy),
@@ -252,6 +284,8 @@ export type WeekDays = typeof WeekDays.Type;
  */
 export const CalendarDoc = Schema.Struct({
   version: Schema.Literal(1),
+  weekStart: WeekIdentity,
+  boundaryOccupancy: Schema.Array(BoundaryOccupancy),
   settings: Settings,
   days: WeekDays,
   todos: Schema.Array(Todo),

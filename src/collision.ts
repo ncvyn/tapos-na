@@ -14,7 +14,7 @@
  * 3. Moving an item within its source day excludes that item from the check.
  */
 
-import { type Day, type DayItem } from "./schema";
+import { type BoundaryOccupancy, type Day, type DayItem } from "./schema";
 import {
   getWeekDayOccupancy,
   spansOverlap,
@@ -40,9 +40,10 @@ export function wouldCollide(
   day: Day,
   placement: ProposedPlacement,
   movingId?: string,
+  boundaryOccupancy: ReadonlyArray<BoundaryOccupancy> = [],
 ): boolean {
-  const blocks = getWeekDayOccupancy(day).effectiveBlocks.filter(
-    (b) => b.id !== movingId,
+  const blocks = getWeekDayOccupancy(day, boundaryOccupancy).effectiveBlocks.filter(
+    (b) => b.source === "boundary" || b.id !== movingId,
   );
   return blocks.some((b) => spansOverlap(placement, b));
 }

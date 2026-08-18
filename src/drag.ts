@@ -91,6 +91,7 @@ export function wouldPayloadCollide(
       end: payload.item.end,
     },
     payload.item.id,
+    targetDay === "monday" ? store.doc.boundaryOccupancy : [],
   );
 }
 
@@ -117,6 +118,7 @@ export function commitDropOnDay(
     store.doc.days[targetDay],
     { tag: item._tag, start: item.start, end: item.end },
     item.id,
+    targetDay === "monday" ? store.doc.boundaryOccupancy : [],
   );
   if (collides) {
     return {

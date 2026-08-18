@@ -94,17 +94,20 @@ export function createCalendarStore(
     day: DayOfWeek,
     candidate: Mutable<CalendarDoc>["days"][DayOfWeek],
   ): boolean => {
-    const conflict = findDayConflict(candidate);
+    const conflict = findDayConflict(
+      candidate,
+      day === "monday" ? doc.boundaryOccupancy : [],
+    );
     if (!conflict) return false;
     setErrorMessage(formatConflict(conflict, day));
     setStatus("error");
     return true;
   };
 
-  const load = async (): Promise<void> => {
+  const load = async (now?: Date | number): Promise<void> => {
     const program = Effect.gen(function* () {
       const storage = yield* StorageService;
-      return yield* storage.loadDoc();
+      return yield* storage.loadDoc(now);
     });
 
     try {

@@ -14,11 +14,18 @@
 
 import { Context, Data, Effect, Layer } from "effect";
 import {
+  WEEKDAY_NAMES,
+  type BoundaryOccupancy,
   type CalendarDoc,
   decodeCalendarDoc,
   encodeCalendarDoc,
 } from "./schema";
 import { findCalendarConflict, formatConflict } from "./conflicts";
+import {
+  addDays,
+  getWeekIdentity,
+  type LocalDate,
+} from "./time";
 
 export const STORAGE_KEY = "tapos-na:calendar-doc:v1";
 
@@ -40,7 +47,10 @@ export class CorruptDocError extends Data.TaggedError("CorruptDocError")<{
 // Default Doc Creation
 // ---------------------------------------------------------------------------
 
-export function createDefaultDoc(timezone?: string): CalendarDoc {
+export function createDefaultDoc(
+  timezone?: string,
+  now: Date | number = new Date(),
+): CalendarDoc {
   let tz = timezone;
   if (!tz) {
     try {
@@ -57,6 +67,8 @@ export function createDefaultDoc(timezone?: string): CalendarDoc {
 
   return {
     version: 1,
+    weekStart: getWeekIdentity(tz, now),
+    boundaryOccupancy: [],
     settings: {
       workLength: 25,
       breakLength: 5,
@@ -75,6 +87,124 @@ export function createDefaultDoc(timezone?: string): CalendarDoc {
     },
     todos: [],
   };
+}
+
+function weekIdentityToDate(identity: string): LocalDate {
+  const [year, month, day] = identity.split("-").map(Number);
+  return { year, month, day };
+}
+
+function isValidWeekIdentity(identity: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(identity)) return false;
+  const date = new Date(`${identity}T00:00:00.000Z`);
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.toISOString().slice(0, 10) === identity &&
+    date.getUTCDay() === 1
+  );
+}
+
+function boundaryFromSpan(
+  id: string,
+  start: number,
+  end: number,
+): BoundaryOccupancy | null {
+  return start > end ? { id, start: 0, end } : null;
+}
+
+function deriveBoundaryOccupancy(
+  doc: CalendarDoc,
+  carryOneOffSleep: boolean,
+): BoundaryOccupancy[] {
+  const sunday = doc.days.sunday;
+  const boundary: BoundaryOccupancy[] = [];
+
+  // A Sunday override replaces recurring sleep for that Week day. When weeks
+  // are skipped, the override is gone and the recurring template resumes.
+  const recurringSleep =
+    carryOneOffSleep && sunday.sleepOverride !== undefined
+      ? sunday.sleepOverride.map((block, index) => ({
+          id: `boundary-override-${index}-${block.start}-${block.end}`,
+          start: block.start,
+          end: block.end,
+        }))
+      : sunday.template.sleep.map((block) => ({
+          id: `boundary-template-${block.id}`,
+          start: block.start,
+          end: block.end,
+        }));
+
+  for (const block of recurringSleep) {
+    const derived = boundaryFromSpan(block.id, block.start, block.end);
+    if (derived) boundary.push(derived);
+  }
+
+  if (carryOneOffSleep) {
+    for (const item of sunday.items) {
+      if (item._tag !== "sleep") continue;
+      const derived = boundaryFromSpan(
+        `boundary-one-off-${item.id}`,
+        item.start,
+        item.end,
+      );
+      if (derived) boundary.push(derived);
+    }
+  }
+
+  return boundary;
+}
+
+/**
+ * Roll a document forward to a later local Week. Recurring templates survive;
+ * Week-owned data is reset and Monday boundary occupancy is freshly derived.
+ */
+export function rolloverCalendarDoc(
+  doc: CalendarDoc,
+  targetWeekStart: string,
+): CalendarDoc {
+  if (!isValidWeekIdentity(doc.weekStart)) {
+    throw new Error(`Invalid stored Week identity: ${doc.weekStart}`);
+  }
+  if (!isValidWeekIdentity(targetWeekStart)) {
+    throw new Error(`Invalid target Week identity: ${targetWeekStart}`);
+  }
+  if (targetWeekStart === doc.weekStart) return doc;
+
+  const sourceDate = weekIdentityToDate(doc.weekStart);
+  const targetDate = weekIdentityToDate(targetWeekStart);
+  const previousWeek = addDays(targetDate, -7);
+  const isImmediate =
+    formatDate(previousWeek) === doc.weekStart;
+  if (Date.UTC(targetDate.year, targetDate.month - 1, targetDate.day) <
+      Date.UTC(sourceDate.year, sourceDate.month - 1, sourceDate.day)) {
+    throw new Error("Cannot roll a CalendarDoc backward");
+  }
+
+  const days = {} as {
+    -readonly [Key in keyof CalendarDoc["days"]]: CalendarDoc["days"][Key];
+  };
+  for (const day of WEEKDAY_NAMES) {
+    const sourceDay = doc.days[day];
+    days[day] = {
+      template: sourceDay.template,
+      items: [],
+    };
+  }
+
+  return {
+    version: doc.version,
+    weekStart: targetWeekStart as CalendarDoc["weekStart"],
+    boundaryOccupancy: deriveBoundaryOccupancy(doc, isImmediate),
+    settings: doc.settings,
+    days,
+    todos: [],
+  };
+}
+
+function formatDate(date: LocalDate): string {
+  return `${date.year.toString().padStart(4, "0")}-${date.month
+    .toString()
+    .padStart(2, "0")}-${date.day.toString().padStart(2, "0")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +270,7 @@ export function importDocJson(
 // ---------------------------------------------------------------------------
 
 export interface StorageService {
-  readonly loadDoc: () => Effect.Effect<CalendarDoc, StorageError | CorruptDocError>;
+  readonly loadDoc: (now?: Date | number) => Effect.Effect<CalendarDoc, StorageError | CorruptDocError>;
   readonly saveDoc: (doc: CalendarDoc) => Effect.Effect<void, StorageError>;
   readonly exportDocJson: (doc: CalendarDoc) => Effect.Effect<string>;
   readonly importDocJson: (json: string) => Effect.Effect<CalendarDoc, CorruptDocError>;
@@ -158,16 +288,51 @@ export function makeMemoryStorageLayer(initialDoc?: CalendarDoc): Layer.Layer<St
   return Layer.succeed(
     StorageService,
     StorageService.of({
-      loadDoc: () =>
-        Effect.sync(() => {
-          if (currentDoc === null) {
-            currentDoc = createDefaultDoc();
-          }
-          return { ...currentDoc };
+      loadDoc: (now = new Date()) =>
+        Effect.try({
+          try: () => {
+            if (currentDoc === null) {
+              currentDoc = createDefaultDoc(undefined, now);
+            }
+            const rolled = rolloverCalendarDoc(
+              currentDoc,
+              getWeekIdentity(currentDoc.settings.timezone, now),
+            );
+            const conflict = findCalendarConflict(rolled);
+            if (conflict) {
+              throw new CorruptDocError({
+                message: `Stored document contains invalid overlap: ${formatConflict(conflict)}`,
+              });
+            }
+            currentDoc = rolled;
+            return { ...rolled };
+          },
+          catch: (cause) => {
+            if (cause instanceof CorruptDocError) return cause;
+            return new StorageError({
+              message: "Failed to load document from memory",
+              cause,
+            });
+          },
         }),
       saveDoc: (doc: CalendarDoc) =>
-        Effect.sync(() => {
-          currentDoc = { ...doc };
+        Effect.try({
+          try: () => {
+            const conflict = findCalendarConflict(doc);
+            if (conflict) {
+              throw new StorageError({
+                message: `Cannot save document with invalid overlap: ${formatConflict(conflict)}`,
+              });
+            }
+            currentDoc = { ...doc };
+          },
+          catch: (cause) =>
+            cause instanceof StorageError
+              ? cause
+              : new StorageError({
+                  message: "Failed to save document to memory",
+                  cause,
+                }),
         }),
       exportDocJson: (doc: CalendarDoc) => exportDocJson(doc),
       importDocJson: (json: string) => importDocJson(json),
@@ -190,16 +355,16 @@ export function makeLocalStorageLayer(
   return Layer.succeed(
     StorageService,
     StorageService.of({
-      loadDoc: () =>
+      loadDoc: (now = new Date()) =>
         Effect.try({
           try: () => {
             const store = getStorage();
             if (!store) {
-              return createDefaultDoc();
+              return createDefaultDoc(undefined, now);
             }
             const raw = store.getItem(storageKey);
             if (!raw) {
-              const defaultDoc = createDefaultDoc();
+              const defaultDoc = createDefaultDoc(undefined, now);
               const encoded = encodeCalendarDoc(defaultDoc);
               store.setItem(storageKey, JSON.stringify(encoded));
               return defaultDoc;
@@ -212,13 +377,21 @@ export function makeLocalStorageLayer(
                 cause: decoded.left,
               });
             }
-            const conflict = findCalendarConflict(decoded.right);
+            const targetWeekStart = getWeekIdentity(
+              decoded.right.settings.timezone,
+              now,
+            );
+            const rolled = rolloverCalendarDoc(decoded.right, targetWeekStart);
+            const conflict = findCalendarConflict(rolled);
             if (conflict) {
               throw new CorruptDocError({
                 message: `Stored document contains invalid overlap: ${formatConflict(conflict)}`,
               });
             }
-            return decoded.right;
+            if (rolled !== decoded.right) {
+              store.setItem(storageKey, JSON.stringify(encodeCalendarDoc(rolled)));
+            }
+            return rolled;
           },
           catch: (error) => {
             if (error instanceof CorruptDocError) {

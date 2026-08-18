@@ -2,7 +2,7 @@
  * Time and timezone utilities for calendar rendering and DST-aware calculations.
  */
 
-import { type DayOfWeek } from "./schema";
+import { type DayOfWeek, type WeekIdentity } from "./schema";
 
 const WEEKDAY_INDEX_MAP: Record<string, DayOfWeek> = {
   Monday: "monday",
@@ -169,6 +169,21 @@ export function getWeekStartDate(
     month: utc.getUTCMonth() + 1,
     day: utc.getUTCDate(),
   };
+}
+
+/** Format a local date as the canonical Week identity. */
+export function formatLocalDate(date: LocalDate): WeekIdentity {
+  return `${date.year.toString().padStart(4, "0")}-${date.month
+    .toString()
+    .padStart(2, "0")}-${date.day.toString().padStart(2, "0")}` as WeekIdentity;
+}
+
+/** Get the local Monday identity for the Week containing an instant. */
+export function getWeekIdentity(
+  timezone: string,
+  now: Date | number = new Date(),
+): WeekIdentity {
+  return formatLocalDate(getWeekStartDate(timezone, now));
 }
 
 /** Shift a local calendar date by whole days (DST-free arithmetic). */

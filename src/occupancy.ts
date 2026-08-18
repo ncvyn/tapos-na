@@ -7,7 +7,7 @@
  * schedule placement.
  */
 
-import type { Day, DayItem } from "./schema";
+import type { BoundaryOccupancy, Day, DayItem } from "./schema";
 
 /** A non-wrapping interval in minutes from local midnight. */
 export interface Span {
@@ -19,7 +19,7 @@ export interface Span {
 export type FreeSpan = Span;
 
 /** Where an effective block came from. */
-export type BlockSource = "template" | "one-off" | "override";
+export type BlockSource = "template" | "one-off" | "override" | "boundary";
 
 /** An item that occupies a Week day after template expansion. */
 export interface EffectiveBlock {
@@ -67,8 +67,20 @@ export function spansOverlap(a: Span, b: Span): boolean {
  * Effective blocks retain deterministic source order; intervals are sorted
  * and merged because their order is a scheduling invariant.
  */
-export function getWeekDayOccupancy(day: Day): WeekDayOccupancy {
+export function getWeekDayOccupancy(
+  day: Day,
+  boundaryOccupancy: ReadonlyArray<BoundaryOccupancy> = [],
+): WeekDayOccupancy {
   const effectiveBlocks = expandEffectiveBlocks(day);
+  for (const boundary of boundaryOccupancy) {
+    effectiveBlocks.unshift({
+      _tag: "sleep",
+      id: boundary.id,
+      start: boundary.start,
+      end: boundary.end,
+      source: "boundary",
+    });
+  }
   const occupiedIntervals = mergeIntervals(
     effectiveBlocks.flatMap((block) =>
       (block._tag === "sleep"
