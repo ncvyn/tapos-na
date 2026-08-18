@@ -17,9 +17,9 @@ const MONDAY = "2026-08-17";
 const NEXT_MONDAY = "2026-08-24";
 const SKIPPED_MONDAY = "2026-08-31";
 
-function docAt(weekStart = "2026-08-10"): CalendarDoc {
+function docAt(weekIdentity = "2026-08-10"): CalendarDoc {
   const doc = createDefaultDoc("UTC", Date.parse("2026-08-10T12:00:00Z"));
-  return { ...doc, weekStart: weekStart as CalendarDoc["weekStart"] };
+  return { ...doc, weekIdentity: weekIdentity as CalendarDoc["weekIdentity"] };
 }
 
 describe("Week identity", () => {
@@ -84,7 +84,7 @@ describe("CalendarDoc rollover", () => {
 
     const rolled = rolloverCalendarDoc(doc, NEXT_MONDAY);
 
-    expect(rolled.weekStart).toBe(NEXT_MONDAY);
+    expect(rolled.weekIdentity).toBe(NEXT_MONDAY);
     expect(rolled.settings).toBe(doc.settings);
     expect(rolled.days.monday.template).toBe(doc.days.monday.template);
     expect(rolled.days.monday.items).toEqual([]);
@@ -164,9 +164,9 @@ describe("CalendarDoc rollover", () => {
   it("rejects incomplete and malformed persisted identity/boundary fields", () => {
     const doc = docAt(MONDAY);
     const withoutIdentity = { ...doc } as Record<string, unknown>;
-    delete withoutIdentity.weekStart;
+    delete withoutIdentity.weekIdentity;
     expect(decodeCalendarDoc(withoutIdentity)._tag).toBe("Left");
-    expect(decodeCalendarDoc({ ...doc, weekStart: "2026-08-18" })._tag).toBe("Left");
+    expect(decodeCalendarDoc({ ...doc, weekIdentity: "2026-08-18" })._tag).toBe("Left");
     expect(
       decodeCalendarDoc({
         ...doc,
@@ -202,7 +202,7 @@ describe("Storage rollover", () => {
         layer,
       ),
     );
-    expect(loaded.weekStart).toBe(NEXT_MONDAY);
+    expect(loaded.weekIdentity).toBe(NEXT_MONDAY);
     expect(loaded.boundaryOccupancy).toEqual([
       { id: "boundary-template-night", start: 0, end: 420 },
     ]);
@@ -213,7 +213,20 @@ describe("Storage rollover", () => {
       "America/New_York",
       Date.parse("2026-03-02T12:00:00Z"),
     );
-    const layer = makeMemoryStorageLayer(base);
+    const initial: CalendarDoc = {
+      ...base,
+      days: {
+        ...base.days,
+        sunday: {
+          ...base.days.sunday,
+          template: {
+            ...base.days.sunday.template,
+            sleep: [{ id: "dst-night", start: 1380, end: 420 }],
+          },
+        },
+      },
+    };
+    const layer = makeMemoryStorageLayer(initial);
     const loaded = await Effect.runPromise(
       Effect.provide(
         Effect.gen(function* () {
@@ -224,6 +237,9 @@ describe("Storage rollover", () => {
       ),
     );
 
-    expect(loaded.weekStart).toBe("2026-03-09");
+    expect(loaded.weekIdentity).toBe("2026-03-09");
+    expect(loaded.boundaryOccupancy).toEqual([
+      { id: "boundary-template-dst-night", start: 0, end: 420 },
+    ]);
   });
 });

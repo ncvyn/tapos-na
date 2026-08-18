@@ -17,6 +17,7 @@ import {
   WEEKDAY_NAMES,
   type BoundaryOccupancy,
   type CalendarDoc,
+  type WeekIdentity,
   decodeWeekIdentity,
   decodeCalendarDoc,
   encodeCalendarDoc,
@@ -69,7 +70,7 @@ export function createDefaultDoc(
 
   return {
     version: 1,
-    weekStart: getWeekIdentity(tz, now),
+    weekIdentity: getWeekIdentity(tz, now),
     boundaryOccupancy: [],
     settings: {
       workLength: 25,
@@ -91,12 +92,12 @@ export function createDefaultDoc(
   };
 }
 
-function weekIdentityToDate(identity: string): LocalDate {
+function weekIdentityToDate(identity: WeekIdentity): LocalDate {
   const [year, month, day] = identity.split("-").map(Number);
   return { year, month, day };
 }
 
-function isValidWeekIdentity(identity: string): boolean {
+function isValidWeekIdentity(identity: WeekIdentity): boolean {
   return decodeWeekIdentity(identity)._tag === "Right";
 }
 
@@ -156,20 +157,20 @@ function deriveBoundaryOccupancy(
  */
 export function rolloverCalendarDoc(
   doc: CalendarDoc,
-  targetWeekStart: string,
+  targetWeekIdentity: WeekIdentity,
 ): CalendarDoc {
-  if (!isValidWeekIdentity(doc.weekStart)) {
-    throw new Error(`Invalid stored Week identity: ${doc.weekStart}`);
+  if (!isValidWeekIdentity(doc.weekIdentity)) {
+    throw new Error(`Invalid stored Week identity: ${doc.weekIdentity}`);
   }
-  if (!isValidWeekIdentity(targetWeekStart)) {
-    throw new Error(`Invalid target Week identity: ${targetWeekStart}`);
+  if (!isValidWeekIdentity(targetWeekIdentity)) {
+    throw new Error(`Invalid target Week identity: ${targetWeekIdentity}`);
   }
-  if (targetWeekStart === doc.weekStart) return doc;
+  if (targetWeekIdentity === doc.weekIdentity) return doc;
 
-  const sourceDate = weekIdentityToDate(doc.weekStart);
-  const targetDate = weekIdentityToDate(targetWeekStart);
+  const sourceDate = weekIdentityToDate(doc.weekIdentity);
+  const targetDate = weekIdentityToDate(targetWeekIdentity);
   const previousWeek = addDays(targetDate, -7);
-  const isImmediate = formatLocalDate(previousWeek) === doc.weekStart;
+  const isImmediate = formatLocalDate(previousWeek) === doc.weekIdentity;
   if (Date.UTC(targetDate.year, targetDate.month - 1, targetDate.day) <
       Date.UTC(sourceDate.year, sourceDate.month - 1, sourceDate.day)) {
     throw new Error("Cannot roll a CalendarDoc backward");
@@ -188,7 +189,7 @@ export function rolloverCalendarDoc(
 
   return {
     version: doc.version,
-    weekStart: targetWeekStart,
+    weekIdentity: targetWeekIdentity,
     boundaryOccupancy: deriveBoundaryOccupancy(doc, isImmediate),
     settings: doc.settings,
     days,
@@ -283,6 +284,12 @@ export function makeMemoryStorageLayer(initialDoc?: CalendarDoc): Layer.Layer<St
             if (currentDoc === null) {
               currentDoc = createDefaultDoc(undefined, now);
             }
+            const sourceConflict = findCalendarConflict(currentDoc);
+            if (sourceConflict) {
+              throw new CorruptDocError({
+                message: `Stored document contains invalid overlap: ${formatConflict(sourceConflict)}`,
+              });
+            }
             const rolled = rolloverCalendarDoc(
               currentDoc,
               getWeekIdentity(currentDoc.settings.timezone, now),
@@ -366,11 +373,17 @@ export function makeLocalStorageLayer(
                 cause: decoded.left,
               });
             }
-            const targetWeekStart = getWeekIdentity(
+            const targetWeekIdentity = getWeekIdentity(
               decoded.right.settings.timezone,
               now,
             );
-            const rolled = rolloverCalendarDoc(decoded.right, targetWeekStart);
+            const sourceConflict = findCalendarConflict(decoded.right);
+            if (sourceConflict) {
+              throw new CorruptDocError({
+                message: `Stored document contains invalid overlap: ${formatConflict(sourceConflict)}`,
+              });
+            }
+            const rolled = rolloverCalendarDoc(decoded.right, targetWeekIdentity);
             const conflict = findCalendarConflict(rolled);
             if (conflict) {
               throw new CorruptDocError({

@@ -512,7 +512,7 @@ describe("state store & actions seam", () => {
 
       const importedDoc: CalendarDoc = {
         version: 1,
-        weekStart: "2026-08-17",
+        weekIdentity: "2026-08-17",
         boundaryOccupancy: [],
         settings: {
           workLength: 30,

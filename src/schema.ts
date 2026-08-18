@@ -216,11 +216,7 @@ export type SleepBlock = typeof SleepBlock.Type;
 export const BoundaryOccupancy = Schema.Struct({
   id: Schema.String,
   start: Schema.Literal(0),
-  end: DayTime.pipe(
-    Schema.filter((end) => end > 0, {
-      message: () => "boundary occupancy must end after midnight",
-    }),
-  ),
+  end: Schema.Int.pipe(Schema.between(1, 1439)),
 });
 export type BoundaryOccupancy = typeof BoundaryOccupancy.Type;
 
@@ -281,13 +277,14 @@ export const WeekDays = Schema.Struct({
 export type WeekDays = typeof WeekDays.Type;
 
 /**
- * The single JSON document: exactly Monday–Sunday of the current week
- * (no history), stored in UTC + timezone, plus settings and week-scoped
- * todos. Pomodoros are never stored — they are derived from these inputs.
+ * The single JSON document: exactly one Monday–Sunday Week (no history), with
+ * its local identity, read-only incoming boundary occupancy, settings, and
+ * week-scoped todos. Pomodoros are never stored — they are derived from these
+ * inputs.
  */
 export const CalendarDoc = Schema.Struct({
   version: Schema.Literal(1),
-  weekStart: WeekIdentity,
+  weekIdentity: WeekIdentity,
   boundaryOccupancy: Schema.Array(BoundaryOccupancy),
   settings: Settings,
   days: WeekDays,
