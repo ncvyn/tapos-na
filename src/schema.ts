@@ -53,6 +53,9 @@ export const WeekIdentity = Schema.String.pipe(
 );
 export type WeekIdentity = typeof WeekIdentity.Type;
 
+/** Decode a persisted Week identity without decoding a full CalendarDoc. */
+export const decodeWeekIdentity = Schema.decodeUnknownEither(WeekIdentity);
+
 /** Short 3-letter labels for day-of-week display. */
 export const DAY_LABELS: Record<DayOfWeek, string> = {
   monday: "Mon",

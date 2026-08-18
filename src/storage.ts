@@ -17,12 +17,14 @@ import {
   WEEKDAY_NAMES,
   type BoundaryOccupancy,
   type CalendarDoc,
+  decodeWeekIdentity,
   decodeCalendarDoc,
   encodeCalendarDoc,
 } from "./schema";
 import { findCalendarConflict, formatConflict } from "./conflicts";
 import {
   addDays,
+  formatLocalDate,
   getWeekIdentity,
   type LocalDate,
 } from "./time";
@@ -95,13 +97,7 @@ function weekIdentityToDate(identity: string): LocalDate {
 }
 
 function isValidWeekIdentity(identity: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(identity)) return false;
-  const date = new Date(`${identity}T00:00:00.000Z`);
-  return (
-    !Number.isNaN(date.getTime()) &&
-    date.toISOString().slice(0, 10) === identity &&
-    date.getUTCDay() === 1
-  );
+  return decodeWeekIdentity(identity)._tag === "Right";
 }
 
 function boundaryFromSpan(
@@ -109,7 +105,7 @@ function boundaryFromSpan(
   start: number,
   end: number,
 ): BoundaryOccupancy | null {
-  return start > end ? { id, start: 0, end } : null;
+  return start > end && end > 0 ? { id, start: 0, end } : null;
 }
 
 function deriveBoundaryOccupancy(
@@ -173,8 +169,7 @@ export function rolloverCalendarDoc(
   const sourceDate = weekIdentityToDate(doc.weekStart);
   const targetDate = weekIdentityToDate(targetWeekStart);
   const previousWeek = addDays(targetDate, -7);
-  const isImmediate =
-    formatDate(previousWeek) === doc.weekStart;
+  const isImmediate = formatLocalDate(previousWeek) === doc.weekStart;
   if (Date.UTC(targetDate.year, targetDate.month - 1, targetDate.day) <
       Date.UTC(sourceDate.year, sourceDate.month - 1, sourceDate.day)) {
     throw new Error("Cannot roll a CalendarDoc backward");
@@ -193,18 +188,12 @@ export function rolloverCalendarDoc(
 
   return {
     version: doc.version,
-    weekStart: targetWeekStart as CalendarDoc["weekStart"],
+    weekStart: targetWeekStart,
     boundaryOccupancy: deriveBoundaryOccupancy(doc, isImmediate),
     settings: doc.settings,
     days,
     todos: [],
   };
-}
-
-function formatDate(date: LocalDate): string {
-  return `${date.year.toString().padStart(4, "0")}-${date.month
-    .toString()
-    .padStart(2, "0")}-${date.day.toString().padStart(2, "0")}`;
 }
 
 // ---------------------------------------------------------------------------

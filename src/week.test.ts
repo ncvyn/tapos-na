@@ -126,6 +126,25 @@ describe("CalendarDoc rollover", () => {
     ]);
   });
 
+  it("does not create a boundary block for a midnight-to-midnight degenerate sleep", () => {
+    const base = docAt(MONDAY);
+    const doc: CalendarDoc = {
+      ...base,
+      days: {
+        ...base.days,
+        sunday: {
+          ...base.days.sunday,
+          template: {
+            ...base.days.sunday.template,
+            sleep: [{ id: "degenerate", start: 1440, end: 0 }],
+          },
+        },
+      },
+    };
+
+    expect(rolloverCalendarDoc(doc, NEXT_MONDAY).boundaryOccupancy).toEqual([]);
+  });
+
   it("blocks Monday occupancy, collision checks, and derived schedule", () => {
     const doc = docAt(MONDAY);
     const boundary: BoundaryOccupancy[] = [{ id: "sleep", start: 0, end: 420 }];
@@ -187,5 +206,24 @@ describe("Storage rollover", () => {
     expect(loaded.boundaryOccupancy).toEqual([
       { id: "boundary-template-night", start: 0, end: 420 },
     ]);
+  });
+
+  it("rolls over by local Week identity across the New York DST transition", async () => {
+    const base = createDefaultDoc(
+      "America/New_York",
+      Date.parse("2026-03-02T12:00:00Z"),
+    );
+    const layer = makeMemoryStorageLayer(base);
+    const loaded = await Effect.runPromise(
+      Effect.provide(
+        Effect.gen(function* () {
+          const storage = yield* StorageService;
+          return yield* storage.loadDoc(Date.parse("2026-03-09T12:00:00Z"));
+        }),
+        layer,
+      ),
+    );
+
+    expect(loaded.weekStart).toBe("2026-03-09");
   });
 });
