@@ -42,12 +42,23 @@ describe("derived schedule respects expanded template", () => {
 
     const todoProgress: TodoProgress[] = [
       {
-        todo: { _tag: "todo", id: "t1", title: "Task", pomodoros: 2, priority: "P0" },
+        todo: {
+          _tag: "todo",
+          id: "t1",
+          title: "Task",
+          pomodoros: 2,
+          priority: "P0",
+        },
         remainingPomodoros: 2,
       },
     ];
 
-    const { daySchedule } = computeDaySchedule(day, todoProgress, settings, "monday");
+    const { daySchedule } = computeDaySchedule(
+      day,
+      todoProgress,
+      settings,
+      "monday",
+    );
 
     expect(daySchedule.segments.length).toBeGreaterThan(0);
     for (const seg of daySchedule.segments) {
@@ -66,12 +77,23 @@ describe("derived schedule respects expanded template", () => {
 
     const todoProgress: TodoProgress[] = [
       {
-        todo: { _tag: "todo", id: "t1", title: "Task", pomodoros: 2, priority: "P0" },
+        todo: {
+          _tag: "todo",
+          id: "t1",
+          title: "Task",
+          pomodoros: 2,
+          priority: "P0",
+        },
         remainingPomodoros: 2,
       },
     ];
 
-    const { daySchedule } = computeDaySchedule(day, todoProgress, settings, "monday");
+    const { daySchedule } = computeDaySchedule(
+      day,
+      todoProgress,
+      settings,
+      "monday",
+    );
 
     expect(daySchedule.segments.length).toBeGreaterThan(0);
     for (const seg of daySchedule.segments) {
@@ -90,12 +112,23 @@ describe("derived schedule respects expanded template", () => {
 
     const todoProgress: TodoProgress[] = [
       {
-        todo: { _tag: "todo", id: "t1", title: "Task", pomodoros: 2, priority: "P0" },
+        todo: {
+          _tag: "todo",
+          id: "t1",
+          title: "Task",
+          pomodoros: 2,
+          priority: "P0",
+        },
         remainingPomodoros: 2,
       },
     ];
 
-    const { daySchedule } = computeDaySchedule(day, todoProgress, settings, "monday");
+    const { daySchedule } = computeDaySchedule(
+      day,
+      todoProgress,
+      settings,
+      "monday",
+    );
 
     expect(daySchedule.segments.length).toBeGreaterThan(0);
     for (const seg of daySchedule.segments) {
@@ -116,12 +149,23 @@ describe("derived schedule respects expanded template", () => {
 
     const todoProgress: TodoProgress[] = [
       {
-        todo: { _tag: "todo", id: "t1", title: "Task", pomodoros: 2, priority: "P0" },
+        todo: {
+          _tag: "todo",
+          id: "t1",
+          title: "Task",
+          pomodoros: 2,
+          priority: "P0",
+        },
         remainingPomodoros: 2,
       },
     ];
 
-    const { daySchedule } = computeDaySchedule(day, todoProgress, settings, "monday");
+    const { daySchedule } = computeDaySchedule(
+      day,
+      todoProgress,
+      settings,
+      "monday",
+    );
 
     expect(daySchedule.segments.length).toBeGreaterThan(0);
     for (const seg of daySchedule.segments) {
@@ -134,13 +178,28 @@ describe("derived schedule respects expanded template", () => {
 
     const todoProgress: TodoProgress[] = [
       {
-        todo: { _tag: "todo", id: "t1", title: "Task", pomodoros: 1, priority: "P1" },
+        todo: {
+          _tag: "todo",
+          id: "t1",
+          title: "Task",
+          pomodoros: 1,
+          priority: "P1",
+        },
         remainingPomodoros: 1,
       },
     ];
 
-    const { daySchedule } = computeDaySchedule(day, todoProgress, settings, "monday");
-    expect(daySchedule.segments[0]).toMatchObject({ _tag: "work", start: 0, end: 25 });
+    const { daySchedule } = computeDaySchedule(
+      day,
+      todoProgress,
+      settings,
+      "monday",
+    );
+    expect(daySchedule.segments[0]).toMatchObject({
+      _tag: "work",
+      start: 0,
+      end: 25,
+    });
   });
 });
 
@@ -167,7 +226,13 @@ describe("sleep override isolation", () => {
       settings,
       days,
       todos: [
-        { _tag: "todo", id: "t1", title: "Big Task", pomodoros: 5, priority: "P0" },
+        {
+          _tag: "todo",
+          id: "t1",
+          title: "Big Task",
+          pomodoros: 5,
+          priority: "P0",
+        },
       ],
     };
   }

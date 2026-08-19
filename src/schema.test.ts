@@ -299,13 +299,23 @@ describe("corrupt input fails decode with a typed error", () => {
 
   it("template busy: inverted span (end before start) is rejected", () => {
     expectParseError(() =>
-      Schema.decodeUnknownSync(TemplateBusy)({ id: "tb1", title: "Class", start: 600, end: 480 }),
+      Schema.decodeUnknownSync(TemplateBusy)({
+        id: "tb1",
+        title: "Class",
+        start: 600,
+        end: 480,
+      }),
     );
   });
 
   it("template busy: zero-length span", () => {
     expectParseError(() =>
-      Schema.decodeUnknownSync(TemplateBusy)({ id: "tb1", title: "Class", start: 480, end: 480 }),
+      Schema.decodeUnknownSync(TemplateBusy)({
+        id: "tb1",
+        title: "Class",
+        start: 480,
+        end: 480,
+      }),
     );
   });
 

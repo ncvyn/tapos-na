@@ -1,6 +1,12 @@
 /** Pure pointer- and keyboard-editing calculations for the shared timeline. */
 
-import { WEEKDAY_NAMES, type BoundaryOccupancy, type Day, type DayItem, type DayOfWeek } from "./schema";
+import {
+  WEEKDAY_NAMES,
+  type BoundaryOccupancy,
+  type Day,
+  type DayItem,
+  type DayOfWeek,
+} from "./schema";
 import {
   resolvePlacement,
   resolveResize,
@@ -20,9 +26,10 @@ export function pointerMoveSpan(
   grabOffset: number,
 ): TimelineSpan {
   const rawStart = pointerMinute - grabOffset;
-  const requestedStart = item.start > item.end
-    ? snapTimelineMinutes(((rawStart % 1440) + 1440) % 1440)
-    : snapTimelineMinutes(rawStart);
+  const requestedStart =
+    item.start > item.end
+      ? snapTimelineMinutes(((rawStart % 1440) + 1440) % 1440)
+      : snapTimelineMinutes(rawStart);
   return shiftTimelineSpan(item.start, item.end, requestedStart);
 }
 
@@ -129,11 +136,12 @@ export function keyboardResizeValue(
   edge: ResizeEdge,
   key: string,
 ): number | null {
-  const delta = key === "ArrowUp" || key === "ArrowLeft"
-    ? -15
-    : key === "ArrowDown" || key === "ArrowRight"
-      ? 15
-      : null;
+  const delta =
+    key === "ArrowUp" || key === "ArrowLeft"
+      ? -15
+      : key === "ArrowDown" || key === "ArrowRight"
+        ? 15
+        : null;
   if (delta === null) return null;
   const current = edge === "start" ? item.start : item.end;
   const value = current + delta;

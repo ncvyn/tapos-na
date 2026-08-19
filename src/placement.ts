@@ -71,7 +71,12 @@ export function resolvePlacement(
   if (!isForward(requested.start, requested.end)) return null;
 
   // 2. Shorten from the requested start (end fixed), keeping >= 15 minutes.
-  const shortened = shortenFromStart(day, requested, movingId, boundaryOccupancy);
+  const shortened = shortenFromStart(
+    day,
+    requested,
+    movingId,
+    boundaryOccupancy,
+  );
   if (shortened !== null) return shortened;
 
   // 3. Nearest alternate start that fits the full span (later candidates win).
@@ -222,7 +227,15 @@ function resolveForwardResize(
       : target.value > currentActive;
 
   const active = extending
-    ? clampActiveEdge(day, current, edge, fixed, currentActive, target.value, boundaryOccupancy)
+    ? clampActiveEdge(
+        day,
+        current,
+        edge,
+        fixed,
+        currentActive,
+        target.value,
+        boundaryOccupancy,
+      )
     : target.value;
 
   // A resize that cannot move the active edge at all (it clamps back to the
@@ -235,7 +248,14 @@ function resolveForwardResize(
   // A forward span must stay forward and retain at least 15 minutes.
   if (newEnd <= newStart) return null;
   if (newEnd - newStart < MIN_PLACEMENT_MINUTES) return null;
-  if (wouldCollide(day, { tag: current.tag, start: newStart, end: newEnd }, current.id, boundaryOccupancy)) {
+  if (
+    wouldCollide(
+      day,
+      { tag: current.tag, start: newStart, end: newEnd },
+      current.id,
+      boundaryOccupancy,
+    )
+  ) {
     return null;
   }
 
@@ -260,11 +280,17 @@ function clampActiveEdge(
   for (let active = value; ; active += step) {
     if (edge === "start" && active > currentActive) return currentActive;
     if (edge === "end" && active < currentActive) return currentActive;
-    const candidate = edge === "start"
-      ? { start: active, end: fixed }
-      : { start: fixed, end: active };
+    const candidate =
+      edge === "start"
+        ? { start: active, end: fixed }
+        : { start: fixed, end: active };
     if (
-      !wouldCollide(day, { tag: current.tag, ...candidate }, current.id, boundaryOccupancy)
+      !wouldCollide(
+        day,
+        { tag: current.tag, ...candidate },
+        current.id,
+        boundaryOccupancy,
+      )
     ) {
       return active;
     }
@@ -301,7 +327,14 @@ function resolveWrappingSleepResize(
 
   const duration = end - start + 1440;
   if (duration < MIN_PLACEMENT_MINUTES) return null;
-  if (wouldCollide(day, { tag: current.tag, start, end }, current.id, boundaryOccupancy)) {
+  if (
+    wouldCollide(
+      day,
+      { tag: current.tag, start, end },
+      current.id,
+      boundaryOccupancy,
+    )
+  ) {
     return null;
   }
 
@@ -319,7 +352,12 @@ function clampWrappingEnd(
   for (let end = value; ; end -= 1) {
     if (end <= current.end) return current.end;
     if (
-      !wouldCollide(day, { tag: current.tag, start, end }, current.id, boundaryOccupancy)
+      !wouldCollide(
+        day,
+        { tag: current.tag, start, end },
+        current.id,
+        boundaryOccupancy,
+      )
     ) {
       return end;
     }

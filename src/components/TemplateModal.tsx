@@ -1,9 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import {
-  DAY_LABELS,
-  type DayOfWeek,
-  WEEKDAY_NAMES,
-} from "../schema";
+import { DAY_LABELS, type DayOfWeek, WEEKDAY_NAMES } from "../schema";
 import type { CalendarStore } from "../state";
 import {
   formatTimeSpan,
@@ -277,7 +273,10 @@ export default function TemplateModal(props: TemplateModalProps) {
                 </div>
               </Show>
 
-              <form onSubmit={submitBusy} class="flex flex-wrap items-end gap-2 pt-1">
+              <form
+                onSubmit={submitBusy}
+                class="flex flex-wrap items-end gap-2 pt-1"
+              >
                 <div class="form-control flex-1 min-w-28">
                   <label class="label py-0.5">
                     <span class="label-text text-[10px]">Title</span>
@@ -384,7 +383,10 @@ export default function TemplateModal(props: TemplateModalProps) {
                 </div>
               </Show>
 
-              <form onSubmit={submitSleep} class="flex flex-wrap items-end gap-2 pt-1">
+              <form
+                onSubmit={submitSleep}
+                class="flex flex-wrap items-end gap-2 pt-1"
+              >
                 <div class="form-control w-24">
                   <label class="label py-0.5">
                     <span class="label-text text-[10px]">Start</span>
@@ -517,7 +519,11 @@ export default function TemplateModal(props: TemplateModalProps) {
           </div>
 
           <div class="modal-action border-t border-base-200 pt-3">
-            <button type="button" class="btn btn-primary" onClick={props.onClose}>
+            <button
+              type="button"
+              class="btn btn-primary"
+              onClick={props.onClose}
+            >
               Done
             </button>
           </div>

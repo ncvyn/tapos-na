@@ -10,13 +10,7 @@ import {
   type TodoProgress,
   type WorkSegment,
 } from "./engine";
-import {
-  CalendarDoc,
-  Day,
-  Settings,
-  Todo,
-  WEEKDAY_NAMES,
-} from "./schema";
+import { CalendarDoc, Day, Settings, Todo, WEEKDAY_NAMES } from "./schema";
 
 // ---------------------------------------------------------------------------
 // Test Fixtures
@@ -70,8 +64,20 @@ describe("Greedy Placement by Priority", () => {
     };
 
     const todos: Todo[] = [
-      { _tag: "todo", id: "t-p1", title: "P1 Task", pomodoros: 2, priority: "P1" },
-      { _tag: "todo", id: "t-p0", title: "P0 Task", pomodoros: 2, priority: "P0" },
+      {
+        _tag: "todo",
+        id: "t-p1",
+        title: "P1 Task",
+        pomodoros: 2,
+        priority: "P1",
+      },
+      {
+        _tag: "todo",
+        id: "t-p0",
+        title: "P0 Task",
+        pomodoros: 2,
+        priority: "P0",
+      },
     ];
 
     const todoProgress: TodoProgress[] = todos.map((t) => ({
@@ -147,7 +153,13 @@ describe("Work/Break Lengths & Long Break Cadence", () => {
     };
 
     const todos: Todo[] = [
-      { _tag: "todo", id: "t1", title: "Big Task", pomodoros: 5, priority: "P0" },
+      {
+        _tag: "todo",
+        id: "t1",
+        title: "Big Task",
+        pomodoros: 5,
+        priority: "P0",
+      },
     ];
 
     const { daySchedule } = computeDaySchedule(
@@ -186,7 +198,13 @@ describe("Work/Break Lengths & Long Break Cadence", () => {
     };
 
     const todos: Todo[] = [
-      { _tag: "todo", id: "t1", title: "Big Task", pomodoros: 5, priority: "P0" },
+      {
+        _tag: "todo",
+        id: "t1",
+        title: "Big Task",
+        pomodoros: 5,
+        priority: "P0",
+      },
     ];
 
     const { daySchedule } = computeDaySchedule(
@@ -224,8 +242,22 @@ describe("Mini-Focus Behavior", () => {
     const day: Day = {
       template: { busy: [], sleep: [] },
       items: [
-        { _tag: "busy", id: "b1", title: "Class 1", day: "monday", start: 0, end: 500 },
-        { _tag: "busy", id: "b2", title: "Class 2", day: "monday", start: 520, end: 1440 },
+        {
+          _tag: "busy",
+          id: "b1",
+          title: "Class 1",
+          day: "monday",
+          start: 0,
+          end: 500,
+        },
+        {
+          _tag: "busy",
+          id: "b2",
+          title: "Class 2",
+          day: "monday",
+          start: 520,
+          end: 1440,
+        },
       ], // free span: [500, 520] (20 mins)
     };
 
@@ -258,8 +290,22 @@ describe("Mini-Focus Behavior", () => {
     const day: Day = {
       template: { busy: [], sleep: [] },
       items: [
-        { _tag: "busy", id: "b1", title: "Class 1", day: "monday", start: 0, end: 500 },
-        { _tag: "busy", id: "b2", title: "Class 2", day: "monday", start: 520, end: 1440 },
+        {
+          _tag: "busy",
+          id: "b1",
+          title: "Class 1",
+          day: "monday",
+          start: 0,
+          end: 500,
+        },
+        {
+          _tag: "busy",
+          id: "b2",
+          title: "Class 2",
+          day: "monday",
+          start: 520,
+          end: 1440,
+        },
       ], // free span: [500, 520] (20 mins)
     };
 
@@ -288,8 +334,22 @@ describe("Due Dates & Week Schedule", () => {
     const busyDay = (d: (typeof WEEKDAY_NAMES)[number]): Day => ({
       template: { busy: [], sleep: [] },
       items: [
-        { _tag: "busy", id: `b1-${d}`, title: "Busy Morning", day: d, start: 0, end: 720 },
-        { _tag: "busy", id: `b2-${d}`, title: "Busy Afternoon", day: d, start: 780, end: 1440 },
+        {
+          _tag: "busy",
+          id: `b1-${d}`,
+          title: "Busy Morning",
+          day: d,
+          start: 0,
+          end: 720,
+        },
+        {
+          _tag: "busy",
+          id: `b2-${d}`,
+          title: "Busy Afternoon",
+          day: d,
+          start: 780,
+          end: 1440,
+        },
       ],
     });
 
@@ -320,15 +380,21 @@ describe("Due Dates & Week Schedule", () => {
     const weekSchedule = computeSchedule(doc);
 
     // Monday gets 2 pomodoros (50m work + 10m break = 60m)
-    const monWork = weekSchedule.monday.segments.filter((s) => s._tag === "work");
+    const monWork = weekSchedule.monday.segments.filter(
+      (s) => s._tag === "work",
+    );
     expect(monWork).toHaveLength(2);
 
     // Tuesday gets 2 pomodoros (50m work + 10m break = 60m)
-    const tueWork = weekSchedule.tuesday.segments.filter((s) => s._tag === "work");
+    const tueWork = weekSchedule.tuesday.segments.filter(
+      (s) => s._tag === "work",
+    );
     expect(tueWork).toHaveLength(2);
 
     // Wednesday gets 0 pomodoros because dueDate was Tuesday!
-    const wedWork = weekSchedule.wednesday.segments.filter((s) => s._tag === "work");
+    const wedWork = weekSchedule.wednesday.segments.filter(
+      (s) => s._tag === "work",
+    );
     expect(wedWork).toHaveLength(0);
   });
 
@@ -337,7 +403,13 @@ describe("Due Dates & Week Schedule", () => {
     const doc1: CalendarDoc = {
       ...baseDoc,
       todos: [
-        { _tag: "todo", id: "t1", title: "Task", pomodoros: 10, priority: "P0" },
+        {
+          _tag: "todo",
+          id: "t1",
+          title: "Task",
+          pomodoros: 10,
+          priority: "P0",
+        },
       ],
     };
 
@@ -351,7 +423,14 @@ describe("Due Dates & Week Schedule", () => {
         wednesday: {
           template: { busy: [], sleep: [] },
           items: [
-            { _tag: "busy", id: "b-wed", title: "Class", day: "wednesday", start: 600, end: 900 },
+            {
+              _tag: "busy",
+              id: "b-wed",
+              title: "Class",
+              day: "wednesday",
+              start: 600,
+              end: 900,
+            },
           ],
         },
       },
@@ -378,7 +457,10 @@ describe("Due Dates & Week Schedule", () => {
  * `defaultSettings`; change those lengths and this fixture no longer means
  * "one pomodoro".
  */
-function narrowDay(dayName: (typeof WEEKDAY_NAMES)[number], start: number): Day {
+function narrowDay(
+  dayName: (typeof WEEKDAY_NAMES)[number],
+  start: number,
+): Day {
   return {
     template: {
       busy: [],
@@ -431,7 +513,10 @@ describe("Due Dates & Morning-First Spill (T7)", () => {
           priority: "P0",
         },
       ],
-      days: narrowWeek({ monday: narrowDay("monday", 0), tuesday: narrowDay("tuesday", 480) }),
+      days: narrowWeek({
+        monday: narrowDay("monday", 0),
+        tuesday: narrowDay("tuesday", 480),
+      }),
     };
 
     const week = computeSchedule(doc);
@@ -457,7 +542,10 @@ describe("Due Dates & Morning-First Spill (T7)", () => {
       ],
       days: narrowWeek({
         monday: narrowDay("monday", 0),
-        tuesday: { template: { busy: [], sleep: [{ id: "s", start: 0, end: 480 }] }, items: [] },
+        tuesday: {
+          template: { busy: [], sleep: [{ id: "s", start: 0, end: 480 }] },
+          items: [],
+        },
       }),
     };
 
@@ -466,7 +554,10 @@ describe("Due Dates & Morning-First Spill (T7)", () => {
     expect(workSegments(week, "monday")).toHaveLength(1);
     expect(workSegments(week, "tuesday")).toHaveLength(1);
     // The spill lands in Tuesday's earliest free slot (08:00, the morning).
-    expect(workSegments(week, "tuesday")[0]).toMatchObject({ todoId: "t-a", start: 480 });
+    expect(workSegments(week, "tuesday")[0]).toMatchObject({
+      todoId: "t-a",
+      start: 480,
+    });
   });
 
   it("re-sorts a spill against the next day's priorities, displacing strictly-lower-priority work", () => {
@@ -474,10 +565,25 @@ describe("Due Dates & Morning-First Spill (T7)", () => {
     const doc: CalendarDoc = {
       ...baseDoc,
       todos: [
-        { _tag: "todo", id: "t-p0", title: "P0 Spill", pomodoros: 2, priority: "P0" },
-        { _tag: "todo", id: "t-p1", title: "P1 Native", pomodoros: 1, priority: "P1" },
+        {
+          _tag: "todo",
+          id: "t-p0",
+          title: "P0 Spill",
+          pomodoros: 2,
+          priority: "P0",
+        },
+        {
+          _tag: "todo",
+          id: "t-p1",
+          title: "P1 Native",
+          pomodoros: 1,
+          priority: "P1",
+        },
       ],
-      days: narrowWeek({ monday: narrowDay("monday", 0), tuesday: narrowDay("tuesday", 480) }),
+      days: narrowWeek({
+        monday: narrowDay("monday", 0),
+        tuesday: narrowDay("tuesday", 480),
+      }),
     };
 
     const week = computeSchedule(doc);
@@ -500,7 +606,10 @@ describe("Due Dates & Morning-First Spill (T7)", () => {
         { _tag: "todo", id: "t-a", title: "A", pomodoros: 2, priority: "P0" },
         { _tag: "todo", id: "t-b", title: "B", pomodoros: 1, priority: "P0" },
       ],
-      days: narrowWeek({ monday: narrowDay("monday", 0), tuesday: narrowDay("tuesday", 480) }),
+      days: narrowWeek({
+        monday: narrowDay("monday", 0),
+        tuesday: narrowDay("tuesday", 480),
+      }),
     };
 
     const week = computeSchedule(doc);
@@ -520,7 +629,13 @@ describe("Due Dates & Morning-First Spill (T7)", () => {
     const doc1: CalendarDoc = {
       ...baseDoc,
       todos: [
-        { _tag: "todo", id: "t-a", title: "Task", pomodoros: 8, priority: "P0" },
+        {
+          _tag: "todo",
+          id: "t-a",
+          title: "Task",
+          pomodoros: 8,
+          priority: "P0",
+        },
       ],
       days: narrowWeek({
         monday: narrowDay("monday", 0),

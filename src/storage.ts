@@ -171,8 +171,10 @@ export function rolloverCalendarDoc(
   const targetDate = weekIdentityToDate(targetWeekIdentity);
   const previousWeek = addDays(targetDate, -7);
   const isImmediate = formatLocalDate(previousWeek) === doc.weekIdentity;
-  if (Date.UTC(targetDate.year, targetDate.month - 1, targetDate.day) <
-      Date.UTC(sourceDate.year, sourceDate.month - 1, sourceDate.day)) {
+  if (
+    Date.UTC(targetDate.year, targetDate.month - 1, targetDate.day) <
+    Date.UTC(sourceDate.year, sourceDate.month - 1, sourceDate.day)
+  ) {
     throw new Error("Cannot roll a CalendarDoc backward");
   }
 
@@ -260,19 +262,26 @@ export function importDocJson(
 // ---------------------------------------------------------------------------
 
 export interface StorageService {
-  readonly loadDoc: (now?: Date | number) => Effect.Effect<CalendarDoc, StorageError | CorruptDocError>;
+  readonly loadDoc: (
+    now?: Date | number,
+  ) => Effect.Effect<CalendarDoc, StorageError | CorruptDocError>;
   readonly saveDoc: (doc: CalendarDoc) => Effect.Effect<void, StorageError>;
   readonly exportDocJson: (doc: CalendarDoc) => Effect.Effect<string>;
-  readonly importDocJson: (json: string) => Effect.Effect<CalendarDoc, CorruptDocError>;
+  readonly importDocJson: (
+    json: string,
+  ) => Effect.Effect<CalendarDoc, CorruptDocError>;
 }
 
-export const StorageService = Context.GenericTag<StorageService>("StorageService");
+export const StorageService =
+  Context.GenericTag<StorageService>("StorageService");
 
 // ---------------------------------------------------------------------------
 // Implementations (In-Memory & LocalStorage)
 // ---------------------------------------------------------------------------
 
-export function makeMemoryStorageLayer(initialDoc?: CalendarDoc): Layer.Layer<StorageService> {
+export function makeMemoryStorageLayer(
+  initialDoc?: CalendarDoc,
+): Layer.Layer<StorageService> {
   let currentDoc: CalendarDoc | null = initialDoc ? { ...initialDoc } : null;
 
   return Layer.succeed(
@@ -383,7 +392,10 @@ export function makeLocalStorageLayer(
                 message: `Stored document contains invalid overlap: ${formatConflict(sourceConflict)}`,
               });
             }
-            const rolled = rolloverCalendarDoc(decoded.right, targetWeekIdentity);
+            const rolled = rolloverCalendarDoc(
+              decoded.right,
+              targetWeekIdentity,
+            );
             const conflict = findCalendarConflict(rolled);
             if (conflict) {
               throw new CorruptDocError({
@@ -391,7 +403,10 @@ export function makeLocalStorageLayer(
               });
             }
             if (rolled !== decoded.right) {
-              store.setItem(storageKey, JSON.stringify(encodeCalendarDoc(rolled)));
+              store.setItem(
+                storageKey,
+                JSON.stringify(encodeCalendarDoc(rolled)),
+              );
             }
             return rolled;
           },

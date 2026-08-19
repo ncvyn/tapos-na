@@ -146,12 +146,7 @@ export default function ItemModal(props: ItemModalProps) {
           end: endMin,
         };
 
-        const saved = commitDayItemEdit(
-          targetDay,
-          startMin,
-          endMin,
-          dayItem,
-        );
+        const saved = commitDayItemEdit(targetDay, startMin, endMin, dayItem);
         if (!saved) {
           setErrorMessage(props.store.errorMessage() ?? "Blocks overlap");
           return;
@@ -170,12 +165,7 @@ export default function ItemModal(props: ItemModalProps) {
           end: endMin,
         };
 
-        const saved = commitDayItemEdit(
-          targetDay,
-          startMin,
-          endMin,
-          sleepItem,
-        );
+        const saved = commitDayItemEdit(targetDay, startMin, endMin, sleepItem);
         if (!saved) {
           setErrorMessage(props.store.errorMessage() ?? "Blocks overlap");
           return;
@@ -201,7 +191,8 @@ export default function ItemModal(props: ItemModalProps) {
     dayItem: DayItem,
   ): boolean => {
     const isEdit = editingId() !== null;
-    if (!isEdit || originalDay() === null) return props.store.addDayItem(dayItem);
+    if (!isEdit || originalDay() === null)
+      return props.store.addDayItem(dayItem);
 
     const original = props.itemToEdit;
     const originalStart =

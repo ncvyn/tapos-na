@@ -12,7 +12,12 @@ import { describe, expect, it } from "vitest";
 import { computeSchedule } from "./engine";
 import { createCalendarStore } from "./state";
 import { makeMemoryStorageLayer } from "./storage";
-import { type Busy, type Event as CalendarEvent, type Sleep, type Todo } from "./schema";
+import {
+  type Busy,
+  type Event as CalendarEvent,
+  type Sleep,
+  type Todo,
+} from "./schema";
 
 describe("Derived Pomodoro Bands Integration (T5)", () => {
   it("computes work and break bands in free gaps between fixed user items", () => {
@@ -111,7 +116,9 @@ describe("Derived Pomodoro Bands Integration (T5)", () => {
     store.addTodo(todo);
 
     let schedule = computeSchedule(store.doc);
-    const initialMondayWorkCount = schedule.monday.segments.filter(s => s._tag === "work").length;
+    const initialMondayWorkCount = schedule.monday.segments.filter(
+      (s) => s._tag === "work",
+    ).length;
     expect(initialMondayWorkCount).toBe(3);
 
     // Add a busy block that covers all afternoon on Monday: 12:00 - 24:00 (720 - 1440)
@@ -149,7 +156,12 @@ describe("Derived Pomodoro Bands Integration (T5)", () => {
     // Verify store doc keys
     expect(store.doc).not.toHaveProperty("segments");
     expect(store.doc).not.toHaveProperty("bands");
-    expect(store.doc.days.monday.items.every(item => (item as any)._tag !== "work" && (item as any)._tag !== "break")).toBe(true);
+    expect(
+      store.doc.days.monday.items.every(
+        (item) =>
+          (item as any)._tag !== "work" && (item as any)._tag !== "break",
+      ),
+    ).toBe(true);
   });
 
   it("recomputes affected day when inputs change, leaving preceding days identical", () => {

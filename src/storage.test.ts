@@ -71,7 +71,9 @@ describe("storage seam", () => {
     });
 
     it("fails importDocJson with CorruptDocError for malformed JSON", async () => {
-      const result = await Effect.runPromiseExit(importDocJson("{ not valid json"));
+      const result = await Effect.runPromiseExit(
+        importDocJson("{ not valid json"),
+      );
       expect(Exit.isFailure(result)).toBe(true);
       if (Exit.isFailure(result)) {
         const error = result.cause;
@@ -211,10 +213,7 @@ describe("storage seam", () => {
       });
 
       const doc = await Effect.runPromise(
-        Effect.provide(
-          program,
-          makeLocalStorageLayer("test-key", mockStorage),
-        ),
+        Effect.provide(program, makeLocalStorageLayer("test-key", mockStorage)),
       );
       expect(doc.version).toBe(1);
       expect(mockStorage.getItem("test-key")).toBeDefined();
@@ -243,10 +242,7 @@ describe("storage seam", () => {
       });
 
       const { updated, reloaded } = await Effect.runPromise(
-        Effect.provide(
-          program,
-          makeLocalStorageLayer("test-key", mockStorage),
-        ),
+        Effect.provide(program, makeLocalStorageLayer("test-key", mockStorage)),
       );
       expect(reloaded).toEqual(updated);
     });
@@ -261,10 +257,7 @@ describe("storage seam", () => {
       });
 
       const result = await Effect.runPromiseExit(
-        Effect.provide(
-          program,
-          makeLocalStorageLayer("test-key", mockStorage),
-        ),
+        Effect.provide(program, makeLocalStorageLayer("test-key", mockStorage)),
       );
       expect(Exit.isFailure(result)).toBe(true);
     });
@@ -300,10 +293,7 @@ describe("storage seam", () => {
       });
 
       const result = await Effect.runPromiseExit(
-        Effect.provide(
-          program,
-          makeLocalStorageLayer("test-key", mockStorage),
-        ),
+        Effect.provide(program, makeLocalStorageLayer("test-key", mockStorage)),
       );
       expect(Exit.isFailure(result)).toBe(true);
       if (Exit.isFailure(result)) {

@@ -15,10 +15,7 @@
  */
 
 import { type BoundaryOccupancy, type Day, type DayItem } from "./schema";
-import {
-  getWeekDayOccupancy,
-  spansOverlap,
-} from "./occupancy";
+import { getWeekDayOccupancy, spansOverlap } from "./occupancy";
 
 /** The draggable day-item kinds (todos are not day-pinned). */
 export type ItemTag = DayItem["_tag"];
@@ -42,8 +39,9 @@ export function wouldCollide(
   movingId?: string,
   boundaryOccupancy: ReadonlyArray<BoundaryOccupancy> = [],
 ): boolean {
-  const blocks = getWeekDayOccupancy(day, boundaryOccupancy).effectiveBlocks.filter(
-    (b) => b.source === "boundary" || b.id !== movingId,
-  );
+  const blocks = getWeekDayOccupancy(
+    day,
+    boundaryOccupancy,
+  ).effectiveBlocks.filter((b) => b.source === "boundary" || b.id !== movingId);
   return blocks.some((b) => spansOverlap(placement, b));
 }

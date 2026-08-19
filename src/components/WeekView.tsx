@@ -76,7 +76,11 @@ function blockName(block: EffectiveBlock): string {
 }
 
 function isInteractive(block: EffectiveBlock): boolean {
-  return block.source === "one-off" || block.source === "template" || block.source === "override";
+  return (
+    block.source === "one-off" ||
+    block.source === "template" ||
+    block.source === "override"
+  );
 }
 
 type PointerPreview = {
@@ -108,16 +112,22 @@ type KeyboardResizeInteraction = {
 };
 
 export default function WeekView(props: WeekViewProps) {
-  const todayWeekday = createMemo(() => getTodayWeekday(props.store.doc.settings.timezone));
+  const todayWeekday = createMemo(() =>
+    getTodayWeekday(props.store.doc.settings.timezone),
+  );
   const weekSchedule = createMemo(() => computeSchedule(props.store.doc));
-  const [dropHighlight, setDropHighlight] = createSignal<DayOfWeek | null>(null);
+  const [dropHighlight, setDropHighlight] = createSignal<DayOfWeek | null>(
+    null,
+  );
   const [pointerInteraction, setPointerInteraction] =
     createSignal<PointerInteraction | null>(null);
   const [pointerPreview, setPointerPreview] =
     createSignal<PointerPreview | null>(null);
   const [keyboardResize, setKeyboardResize] =
     createSignal<KeyboardResizeInteraction | null>(null);
-  const [draggingItemKey, setDraggingItemKey] = createSignal<string | null>(null);
+  const [draggingItemKey, setDraggingItemKey] = createSignal<string | null>(
+    null,
+  );
   let timelineCanvas: HTMLDivElement | undefined;
   let keyboardRoot: HTMLDivElement | undefined;
   const columnElements = new Map<DayOfWeek, HTMLElement>();
@@ -127,7 +137,10 @@ export default function WeekView(props: WeekViewProps) {
     day === "monday" ? props.store.doc.boundaryOccupancy : [];
 
   const minuteAt = (clientY: number) =>
-    timelineMinutesAt(clientY, timelineCanvas?.getBoundingClientRect() ?? { top: 0, height: 0 });
+    timelineMinutesAt(
+      clientY,
+      timelineCanvas?.getBoundingClientRect() ?? { top: 0, height: 0 },
+    );
 
   const dayAt = (clientX: number, fallback: DayOfWeek): DayOfWeek => {
     for (const day of WEEKDAY_NAMES) {
@@ -159,7 +172,8 @@ export default function WeekView(props: WeekViewProps) {
     requestedEnd: number,
   ): string => {
     const placement = `${DAY_LABELS[day]} ${minutesToTime(start)}–${minutesToTime(end)}`;
-    if (!adjusted) return `${mode === "move" ? "Move" : "Resize"} preview: ${placement}`;
+    if (!adjusted)
+      return `${mode === "move" ? "Move" : "Resize"} preview: ${placement}`;
     if (
       mode === "move" &&
       requestedEnd === end &&
@@ -193,7 +207,9 @@ export default function WeekView(props: WeekViewProps) {
     const pointerMinute = minuteAt(event.clientY);
     let requestedStart = interaction.item.start;
     let requestedEnd = interaction.item.end;
-    let resolved: ReturnType<typeof resolvePointerMove> | ReturnType<typeof resolvePointerResize> = null;
+    let resolved:
+      | ReturnType<typeof resolvePointerMove>
+      | ReturnType<typeof resolvePointerResize> = null;
 
     if (interaction.mode === "move") {
       const shifted = pointerMoveSpan(
@@ -424,7 +440,8 @@ export default function WeekView(props: WeekViewProps) {
         });
         return true;
       }
-      if (handleKeyboardResize(event, day, item, activeResize.edge)) return true;
+      if (handleKeyboardResize(event, day, item, activeResize.edge))
+        return true;
     }
 
     if (
@@ -439,9 +456,12 @@ export default function WeekView(props: WeekViewProps) {
       setKeyboardResize({
         day,
         itemId: item.id,
-        edge: active?.day === day && active.itemId === item.id && active.edge === "end"
-          ? "start"
-          : "end",
+        edge:
+          active?.day === day &&
+          active.itemId === item.id &&
+          active.edge === "end"
+            ? "start"
+            : "end",
       });
       return true;
     }
@@ -524,7 +544,11 @@ export default function WeekView(props: WeekViewProps) {
     setDropHighlight(null);
     const payload = getDragPayload(event.dataTransfer);
     if (!payload) return;
-    const { preview, result } = commitDropOnDayWithPreview(props.store, payload, day);
+    const { preview, result } = commitDropOnDayWithPreview(
+      props.store,
+      payload,
+      day,
+    );
     if (!result.ok) {
       props.onDropRefused?.(result.reason);
     } else {
@@ -542,7 +566,9 @@ export default function WeekView(props: WeekViewProps) {
   const handleBlockClick = (day: DayOfWeek, block: EffectiveBlock) => {
     if (suppressClick) return;
     if (block.source === "one-off") {
-      const item = props.store.doc.days[day].items.find((candidate) => candidate.id === block.id);
+      const item = props.store.doc.days[day].items.find(
+        (candidate) => candidate.id === block.id,
+      );
       if (item) props.onOpenEditItem(item);
     } else if (block.source === "template" || block.source === "override") {
       props.onOpenTemplate?.(day);
@@ -552,9 +578,12 @@ export default function WeekView(props: WeekViewProps) {
   const renderBlock = (day: DayOfWeek, block: EffectiveBlock) => (
     <For each={splitTimelineSpan(block.start, block.end)}>
       {(span) => {
-        const item = block.source === "one-off"
-          ? props.store.doc.days[day].items.find((candidate) => candidate.id === block.id)
-          : undefined;
+        const item =
+          block.source === "one-off"
+            ? props.store.doc.days[day].items.find(
+                (candidate) => candidate.id === block.id,
+              )
+            : undefined;
         const continuation = block.start > block.end && span.start === 0;
         const theme = ITEM_THEMES[block._tag];
         return (
@@ -576,7 +605,11 @@ export default function WeekView(props: WeekViewProps) {
             }}
             role={isInteractive(block) ? "button" : undefined}
             aria-readonly={block.source !== "one-off"}
-            aria-keyshortcuts={block.source === "one-off" ? "ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight R [ ]" : undefined}
+            aria-keyshortcuts={
+              block.source === "one-off"
+                ? "ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight R [ ]"
+                : undefined
+            }
             data-keyboard-item={item ? `${day}:${item.id}` : undefined}
             data-keyboard-surface="timeline"
             tabIndex={isInteractive(block) ? 0 : undefined}
@@ -605,21 +638,30 @@ export default function WeekView(props: WeekViewProps) {
               if (item && (event.key === "Enter" || event.key === " ")) {
                 event.preventDefault();
                 handleBlockClick(day, block);
-              } else if (!item && isInteractive(block) && (event.key === "Enter" || event.key === " ")) {
+              } else if (
+                !item &&
+                isInteractive(block) &&
+                (event.key === "Enter" || event.key === " ")
+              ) {
                 event.preventDefault();
               }
             }}
             title={`${sourceLabel(block.source)}: ${continuation ? "Sleep continuation" : blockName(block)} (${formatTimeSpan(span.start, span.end)})`}
             aria-label={`${sourceLabel(block.source)} ${blockName(block)}, ${minutesToTime(span.start)} to ${minutesToTime(span.end)}`}
+          >
+            <Show
+              when={
+                item && (item.start < item.end || span.start === item.start)
+              }
             >
-            <Show when={item && (item.start < item.end || span.start === item.start)}>
               <button
                 type="button"
                 class="absolute inset-x-0 top-0 z-30 h-2 cursor-ns-resize bg-transparent"
                 aria-label={`Resize ${blockName(block)} start`}
                 title="Resize start"
                 onPointerDown={(event) => {
-                  if (item) beginPointerInteraction(event, day, item, span, "start");
+                  if (item)
+                    beginPointerInteraction(event, day, item, span, "start");
                 }}
                 onKeyDown={(event) => {
                   const active = keyboardResize();
@@ -628,7 +670,9 @@ export default function WeekView(props: WeekViewProps) {
                       event,
                       day,
                       item,
-                      active?.day === day && active.itemId === item.id ? active.edge : "start",
+                      active?.day === day && active.itemId === item.id
+                        ? active.edge
+                        : "start",
                     );
                   }
                 }}
@@ -637,18 +681,24 @@ export default function WeekView(props: WeekViewProps) {
             </Show>
             <div class="flex items-start gap-1 font-medium">
               <span>{ITEM_ICONS[block._tag]}</span>
-              <span class="truncate">{continuation ? "Sleep continuation" : blockName(block)}</span>
+              <span class="truncate">
+                {continuation ? "Sleep continuation" : blockName(block)}
+              </span>
             </div>
             <div class="mt-0.5 flex items-center justify-between gap-1 font-mono text-[9px] opacity-80">
               <span>{sourceLabel(block.source)}</span>
-              <span>{minutesToTime(span.start)}–{minutesToTime(span.end)}</span>
+              <span>
+                {minutesToTime(span.start)}–{minutesToTime(span.end)}
+              </span>
             </div>
             <Show
               when={
                 item &&
                 (item.start < item.end ||
                   span.end === item.end ||
-                  (item.start > item.end && item.end === 0 && span.end === 1440))
+                  (item.start > item.end &&
+                    item.end === 0 &&
+                    span.end === 1440))
               }
             >
               <button
@@ -657,7 +707,8 @@ export default function WeekView(props: WeekViewProps) {
                 aria-label={`Resize ${blockName(block)} end`}
                 title="Resize end"
                 onPointerDown={(event) => {
-                  if (item) beginPointerInteraction(event, day, item, span, "end");
+                  if (item)
+                    beginPointerInteraction(event, day, item, span, "end");
                 }}
                 onKeyDown={(event) => {
                   const active = keyboardResize();
@@ -666,7 +717,9 @@ export default function WeekView(props: WeekViewProps) {
                       event,
                       day,
                       item,
-                      active?.day === day && active.itemId === item.id ? active.edge : "end",
+                      active?.day === day && active.itemId === item.id
+                        ? active.edge
+                        : "end",
                     );
                   }
                 }}
@@ -697,17 +750,29 @@ export default function WeekView(props: WeekViewProps) {
     const workTitle = isWork ? segment.todoTitle : undefined;
     return (
       <div
-          class={`pointer-events-none absolute inset-x-1 z-10 overflow-hidden rounded border px-1 text-[9px] leading-tight ${
+        class={`pointer-events-none absolute inset-x-1 z-10 overflow-hidden rounded border px-1 text-[9px] leading-tight ${
           isWork
             ? "border-primary/60 bg-primary/20 text-primary-content"
             : "border-base-content/20 bg-base-300/70 text-base-content/65"
         }`}
         style={timelineBlockStyle(segment)}
-        aria-label={isWork ? `Derived work: ${segment.todoTitle}` : `Derived ${segment.breakType} break`}
+        aria-label={
+          isWork
+            ? `Derived work: ${segment.todoTitle}`
+            : `Derived ${segment.breakType} break`
+        }
       >
         <div class="flex items-center justify-between gap-1 font-mono">
-          <span>{isWork ? `Pomodoro ${segment.pomodoroNumber}` : segment.breakType === "long" ? "Long break" : "Short break"}</span>
-          <span>{minutesToTime(segment.start)}–{minutesToTime(segment.end)}</span>
+          <span>
+            {isWork
+              ? `Pomodoro ${segment.pomodoroNumber}`
+              : segment.breakType === "long"
+                ? "Long break"
+                : "Short break"}
+          </span>
+          <span>
+            {minutesToTime(segment.start)}–{minutesToTime(segment.end)}
+          </span>
         </div>
         <Show when={isWork}>
           <div class="truncate">{workTitle}</div>
@@ -729,14 +794,27 @@ export default function WeekView(props: WeekViewProps) {
       <section aria-labelledby="week-timeline-heading" class="space-y-3">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 id="week-timeline-heading" class="text-lg font-bold">Week timeline</h2>
-            <p class="text-xs text-base-content/60">One shared local wall-clock scale. Stored occupancy is primary; the derived plan is read-only.</p>
+            <h2 id="week-timeline-heading" class="text-lg font-bold">
+              Week timeline
+            </h2>
+            <p class="text-xs text-base-content/60">
+              One shared local wall-clock scale. Stored occupancy is primary;
+              the derived plan is read-only.
+            </p>
           </div>
           <div class="flex flex-wrap gap-2 text-[10px] text-base-content/60">
-            <span class="badge badge-sm border border-base-content/30 bg-base-content/10">Template</span>
-            <span class="badge badge-sm border border-secondary/60 bg-secondary/20">Override</span>
-            <span class="badge badge-sm border border-info border-dashed bg-info/15">Boundary</span>
-            <span class="badge badge-sm border border-primary/60 bg-primary/20">Derived</span>
+            <span class="badge badge-sm border border-base-content/30 bg-base-content/10">
+              Template
+            </span>
+            <span class="badge badge-sm border border-secondary/60 bg-secondary/20">
+              Override
+            </span>
+            <span class="badge badge-sm border border-info border-dashed bg-info/15">
+              Boundary
+            </span>
+            <span class="badge badge-sm border border-primary/60 bg-primary/20">
+              Derived
+            </span>
           </div>
         </div>
         <Show when={pointerPreview()}>
@@ -757,27 +835,37 @@ export default function WeekView(props: WeekViewProps) {
               aria-live="polite"
               data-testid="keyboard-resize-status"
             >
-              Resize mode: {resize().edge} edge active. Use ArrowUp/ArrowDown to adjust by 15 minutes; press R to switch edges or Escape to exit.
+              Resize mode: {resize().edge} edge active. Use ArrowUp/ArrowDown to
+              adjust by 15 minutes; press R to switch edges or Escape to exit.
             </div>
           )}
         </Show>
 
-        <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100 shadow-sm" data-testid="week-timeline-scroll">
-          <div class="min-w-[1000px]">
+        <div
+          class="overflow-x-auto rounded-box border border-base-300 bg-base-100 shadow-sm"
+          data-testid="week-timeline-scroll"
+        >
+          <div class="min-w-250">
             <div class="grid grid-cols-[4.5rem_repeat(7,minmax(8.5rem,1fr))] border-b border-base-300 bg-base-200/50">
               <div aria-hidden="true" />
               <For each={WEEKDAY_NAMES}>
                 {(day) => {
                   const isToday = () => todayWeekday() === day;
                   return (
-                    <div class={`border-l border-base-300 px-2 py-2 ${isToday() ? "bg-primary/10" : ""}`}>
+                    <div
+                      class={`border-l border-base-300 px-2 py-2 ${isToday() ? "bg-primary/10" : ""}`}
+                    >
                       <div class="flex items-center justify-between gap-1">
                         <span class="text-xs font-bold">{DAY_LABELS[day]}</span>
                         <Show when={isToday()}>
-                          <span class="badge badge-primary badge-xs">Today</span>
+                          <span class="badge badge-primary badge-xs">
+                            Today
+                          </span>
                         </Show>
                       </div>
-                      <div class="text-[10px] capitalize text-base-content/50">{day}</div>
+                      <div class="text-[10px] capitalize text-base-content/50">
+                        {day}
+                      </div>
                     </div>
                   );
                 }}
@@ -791,10 +879,17 @@ export default function WeekView(props: WeekViewProps) {
               onPointerUp={finishPointerInteraction}
               onPointerCancel={cancelPointerInteraction}
             >
-              <div class="relative border-r border-base-300" style={{ height: `${TIMELINE_HEIGHT}px` }} aria-hidden="true">
+              <div
+                class="relative border-r border-base-300"
+                style={{ height: `${TIMELINE_HEIGHT}px` }}
+                aria-hidden="true"
+              >
                 <For each={TIME_LABELS}>
                   {(minute) => (
-                    <span class="absolute right-2 -translate-y-1/2 font-mono text-[10px] tabular-nums text-base-content/55" style={{ top: `${timelinePercent(minute)}%` }}>
+                    <span
+                      class="absolute right-2 -translate-y-1/2 font-mono text-[10px] tabular-nums text-base-content/55"
+                      style={{ top: `${timelinePercent(minute)}%` }}
+                    >
                       {minutesToTime(minute)}
                     </span>
                   )}
@@ -813,18 +908,29 @@ export default function WeekView(props: WeekViewProps) {
                       role="gridcell"
                       aria-label={`${DAY_LABELS[day]} timeline, 00:00 to 24:00`}
                       onClick={(event) => {
-                        if (event.target !== event.currentTarget || suppressClick) return;
+                        if (
+                          event.target !== event.currentTarget ||
+                          suppressClick
+                        )
+                          return;
                         const emptyPlacement = emptyTimelinePlacement(
                           minuteAt(event.clientY),
                         );
                         const start = emptyPlacement.start;
-                        const occupied = blocks().some((block) =>
-                          spansOverlap({ start, end: start + 1 }, block),
-                        ) || segments().some((segment) =>
-                          spansOverlap({ start, end: start + 1 }, segment),
-                        );
+                        const occupied =
+                          blocks().some((block) =>
+                            spansOverlap({ start, end: start + 1 }, block),
+                          ) ||
+                          segments().some((segment) =>
+                            spansOverlap({ start, end: start + 1 }, segment),
+                          );
                         if (!occupied) {
-                          props.onOpenAddItem(day, "busy", start, emptyPlacement.end);
+                          props.onOpenAddItem(
+                            day,
+                            "busy",
+                            start,
+                            emptyPlacement.end,
+                          );
                         }
                       }}
                       onDragOver={(event) => handleColumnDragOver(event, day)}
@@ -835,26 +941,48 @@ export default function WeekView(props: WeekViewProps) {
                     >
                       <For each={TIME_LABELS}>
                         {(minute) => (
-                          <div class="pointer-events-none absolute inset-x-0 border-t border-base-200/80" style={{ top: `${timelinePercent(minute)}%` }} />
+                          <div
+                            class="pointer-events-none absolute inset-x-0 border-t border-base-200/80"
+                            style={{ top: `${timelinePercent(minute)}%` }}
+                          />
                         )}
                       </For>
-                      <For each={blocks()}>{(block) => renderBlock(day, block)}</For>
-                      <For each={segments()}>{(segment) => renderSegment(segment)}</For>
-                      <Show when={pointerPreview()?.day === day && !pointerPreview()?.refused}>
-                        <For each={splitTimelineSpan(pointerPreview()!.start, pointerPreview()!.end)}>
+                      <For each={blocks()}>
+                        {(block) => renderBlock(day, block)}
+                      </For>
+                      <For each={segments()}>
+                        {(segment) => renderSegment(segment)}
+                      </For>
+                      <Show
+                        when={
+                          pointerPreview()?.day === day &&
+                          !pointerPreview()?.refused
+                        }
+                      >
+                        <For
+                          each={splitTimelineSpan(
+                            pointerPreview()!.start,
+                            pointerPreview()!.end,
+                          )}
+                        >
                           {(span) => (
                             <div
                               class="pointer-events-none absolute inset-x-1 z-40 overflow-hidden rounded-md border-2 border-warning bg-warning/25 p-1 text-[10px] font-semibold text-warning-content shadow-md"
                               style={timelineBlockStyle(span)}
                               data-testid="timeline-preview"
                             >
-                              Preview {minutesToTime(span.start)}–{minutesToTime(span.end)}
+                              Preview {minutesToTime(span.start)}–
+                              {minutesToTime(span.end)}
                             </div>
                           )}
                         </For>
                       </Show>
-                      <Show when={blocks().length === 0 && segments().length === 0}>
-                        <div class="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-base-content/25">No occupancy</div>
+                      <Show
+                        when={blocks().length === 0 && segments().length === 0}
+                      >
+                        <div class="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-base-content/25">
+                          No occupancy
+                        </div>
                       </Show>
                     </div>
                   );
@@ -865,31 +993,99 @@ export default function WeekView(props: WeekViewProps) {
         </div>
       </section>
 
-      <section class="card border border-base-300 bg-base-100 shadow-sm" aria-labelledby="week-todos-heading">
+      <section
+        class="card border border-base-300 bg-base-100 shadow-sm"
+        aria-labelledby="week-todos-heading"
+      >
         <div class="card-body p-4">
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-base-200 pb-3">
             <div>
-              <h3 id="week-todos-heading" class="card-title text-base font-bold"><span>🍅</span><span>Week Todos</span><span class="badge badge-sm badge-neutral">{props.store.doc.todos.length}</span></h3>
-              <p class="text-xs text-base-content/60">Work is sized by pomodoros and placed into free gaps by priority.</p>
+              <h3
+                id="week-todos-heading"
+                class="card-title text-base font-bold"
+              >
+                <span>🍅</span>
+                <span>Week Todos</span>
+                <span class="badge badge-sm badge-neutral">
+                  {props.store.doc.todos.length}
+                </span>
+              </h3>
+              <p class="text-xs text-base-content/60">
+                Work is sized by pomodoros and placed into free gaps by
+                priority.
+              </p>
             </div>
-            <button type="button" class="btn btn-sm btn-primary" onClick={() => props.onOpenAddItem(undefined, "todo")}>+ Add Todo</button>
+            <button
+              type="button"
+              class="btn btn-sm btn-primary"
+              onClick={() => props.onOpenAddItem(undefined, "todo")}
+            >
+              + Add Todo
+            </button>
           </div>
 
-          <Show when={props.store.doc.todos.length > 0} fallback={<div class="py-6 text-center text-xs italic text-base-content/40">No todos recorded for this week yet. Click "+ Add Todo" to schedule work!</div>}>
+          <Show
+            when={props.store.doc.todos.length > 0}
+            fallback={
+              <div class="py-6 text-center text-xs italic text-base-content/40">
+                No todos recorded for this week yet. Click "+ Add Todo" to
+                schedule work!
+              </div>
+            }
+          >
             <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
               <For each={props.store.doc.todos}>
                 {(todo) => (
                   <div
                     class="flex cursor-grab items-center justify-between rounded-lg border border-base-200 bg-base-200/40 p-2.5 active:cursor-grabbing"
                     draggable
-                    onDragStart={(event) => beginDrag(event.dataTransfer, { kind: "todo", item: todo })}
+                    onDragStart={(event) =>
+                      beginDrag(event.dataTransfer, {
+                        kind: "todo",
+                        item: todo,
+                      })
+                    }
                     title="Drag onto a day column to set its due date"
                   >
                     <div class="min-w-0 pr-2">
-                      <div class="flex items-center gap-1.5 truncate"><span class={`badge badge-xs font-bold ${PRIORITY_BADGES[todo.priority]}`}>{todo.priority}</span><span class="truncate text-sm font-medium">{todo.title}</span></div>
-                      <div class="mt-1 flex items-center gap-2 text-xs text-base-content/70"><span>{todo.pomodoros} {todo.pomodoros === 1 ? "pomodoro" : "pomodoros"}</span><Show when={todo.dueDate}><span class="badge badge-outline badge-xs capitalize">Due {DAY_LABELS[todo.dueDate!]}</span></Show></div>
+                      <div class="flex items-center gap-1.5 truncate">
+                        <span
+                          class={`badge badge-xs font-bold ${PRIORITY_BADGES[todo.priority]}`}
+                        >
+                          {todo.priority}
+                        </span>
+                        <span class="truncate text-sm font-medium">
+                          {todo.title}
+                        </span>
+                      </div>
+                      <div class="mt-1 flex items-center gap-2 text-xs text-base-content/70">
+                        <span>
+                          {todo.pomodoros}{" "}
+                          {todo.pomodoros === 1 ? "pomodoro" : "pomodoros"}
+                        </span>
+                        <Show when={todo.dueDate}>
+                          <span class="badge badge-outline badge-xs capitalize">
+                            Due {DAY_LABELS[todo.dueDate!]}
+                          </span>
+                        </Show>
+                      </div>
                     </div>
-                    <div class="flex shrink-0 gap-1"><button type="button" class="btn btn-ghost btn-xs" onClick={() => props.onOpenEditItem(todo)}>Edit</button><button type="button" class="btn btn-ghost btn-xs text-error" onClick={() => props.store.deleteTodo(todo.id)}>Delete</button></div>
+                    <div class="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-xs"
+                        onClick={() => props.onOpenEditItem(todo)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-xs text-error"
+                        onClick={() => props.store.deleteTodo(todo.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 )}
               </For>

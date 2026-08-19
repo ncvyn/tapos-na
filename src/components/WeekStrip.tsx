@@ -1,5 +1,10 @@
 import { createSignal, For, Show } from "solid-js";
-import { DAY_LABELS, type DayItem, type DayOfWeek, WEEKDAY_NAMES } from "../schema";
+import {
+  DAY_LABELS,
+  type DayItem,
+  type DayOfWeek,
+  WEEKDAY_NAMES,
+} from "../schema";
 import { getWeekDayOccupancy, type EffectiveBlock } from "../occupancy";
 import type { CalendarStore } from "../state";
 import {
@@ -30,7 +35,9 @@ interface WeekStripProps {
 }
 
 export default function WeekStrip(props: WeekStripProps) {
-  const [dropHighlight, setDropHighlight] = createSignal<DayOfWeek | null>(null);
+  const [dropHighlight, setDropHighlight] = createSignal<DayOfWeek | null>(
+    null,
+  );
   const [dropFeedback, setDropFeedback] = createSignal<{
     day: DayOfWeek;
     kind: "preview" | "refused";
@@ -41,7 +48,9 @@ export default function WeekStrip(props: WeekStripProps) {
     itemId: string;
     edge: ResizeEdge;
   } | null>(null);
-  const [draggingItemKey, setDraggingItemKey] = createSignal<string | null>(null);
+  const [draggingItemKey, setDraggingItemKey] = createSignal<string | null>(
+    null,
+  );
   let keyboardRoot: HTMLElement | undefined;
 
   const blocksFor = (day: DayOfWeek) =>
@@ -98,7 +107,11 @@ export default function WeekStrip(props: WeekStripProps) {
     setDropFeedback(null);
     const payload = getDragPayload(event.dataTransfer);
     if (!payload) return;
-    const { preview, result } = commitDropOnDayWithPreview(props.store, payload, day);
+    const { preview, result } = commitDropOnDayWithPreview(
+      props.store,
+      payload,
+      day,
+    );
     if (!result.ok) {
       props.onDropRefused?.(result.reason);
     } else {
@@ -122,7 +135,8 @@ export default function WeekStrip(props: WeekStripProps) {
       setDropFeedback({
         day,
         kind: "refused",
-        message: "Resize refused — the active edge cannot move beyond the Week day boundary.",
+        message:
+          "Resize refused — the active edge cannot move beyond the Week day boundary.",
       });
       return true;
     }
@@ -146,7 +160,10 @@ export default function WeekStrip(props: WeekStripProps) {
       value: edge === "start" ? resolved.start : resolved.end,
     });
     if (!saved) {
-      props.onPlacementNotice?.(props.store.errorMessage() ?? "Resize refused.", "refused");
+      props.onPlacementNotice?.(
+        props.store.errorMessage() ?? "Resize refused.",
+        "refused",
+      );
     } else if (resolved.adjusted) {
       props.onPlacementNotice?.(
         `Adjusted: resized at ${DAY_LABELS[day]} ${minutesToTime(resolved.start)}–${minutesToTime(resolved.end)}`,
@@ -174,7 +191,10 @@ export default function WeekStrip(props: WeekStripProps) {
       if (event.key === "[" || event.key === "]") {
         event.preventDefault();
         event.stopPropagation();
-        setKeyboardResize({ ...activeResize, edge: event.key === "[" ? "start" : "end" });
+        setKeyboardResize({
+          ...activeResize,
+          edge: event.key === "[" ? "start" : "end",
+        });
         setDropFeedback({
           day,
           kind: "preview",
@@ -182,7 +202,8 @@ export default function WeekStrip(props: WeekStripProps) {
         });
         return true;
       }
-      if (handleKeyboardResize(event, day, item, activeResize.edge)) return true;
+      if (handleKeyboardResize(event, day, item, activeResize.edge))
+        return true;
     }
 
     if (
@@ -194,9 +215,12 @@ export default function WeekStrip(props: WeekStripProps) {
       event.preventDefault();
       event.stopPropagation();
       const active = keyboardResize();
-      const edge = active?.day === day && active.itemId === item.id && active.edge === "end"
-        ? "start"
-        : "end";
+      const edge =
+        active?.day === day &&
+        active.itemId === item.id &&
+        active.edge === "end"
+          ? "start"
+          : "end";
       setKeyboardResize({ day, itemId: item.id, edge });
       setDropFeedback({
         day,
@@ -211,7 +235,8 @@ export default function WeekStrip(props: WeekStripProps) {
       if (
         (!event.shiftKey &&
           (event.key === "ArrowUp" || event.key === "ArrowDown")) ||
-        (event.shiftKey && (event.key === "ArrowLeft" || event.key === "ArrowRight"))
+        (event.shiftKey &&
+          (event.key === "ArrowLeft" || event.key === "ArrowRight"))
       ) {
         event.preventDefault();
         event.stopPropagation();
@@ -249,7 +274,10 @@ export default function WeekStrip(props: WeekStripProps) {
       resolved.end,
     );
     if (!saved) {
-      props.onPlacementNotice?.(props.store.errorMessage() ?? "Move refused.", "refused");
+      props.onPlacementNotice?.(
+        props.store.errorMessage() ?? "Move refused.",
+        "refused",
+      );
     } else if (resolved.adjusted) {
       props.onPlacementNotice?.(
         `Adjusted: placed at ${DAY_LABELS[request.targetDay]} ${minutesToTime(resolved.start)}–${minutesToTime(resolved.end)}`,
@@ -262,7 +290,9 @@ export default function WeekStrip(props: WeekStripProps) {
 
   const handleBlockClick = (day: DayOfWeek, block: EffectiveBlock) => {
     if (block.source === "one-off") {
-      const item = props.store.doc.days[day].items.find((candidate) => candidate.id === block.id);
+      const item = props.store.doc.days[day].items.find(
+        (candidate) => candidate.id === block.id,
+      );
       if (item) props.onOpenEditItem(item);
     } else if (block.source === "template" || block.source === "override") {
       props.onOpenTemplate?.(day);
@@ -270,13 +300,19 @@ export default function WeekStrip(props: WeekStripProps) {
   };
 
   return (
-    <section ref={keyboardRoot} aria-labelledby="week-strip-heading" class="space-y-2">
+    <section
+      ref={keyboardRoot}
+      aria-labelledby="week-strip-heading"
+      class="space-y-2"
+    >
       <div class="flex items-end justify-between gap-3">
         <div>
           <h2 id="week-strip-heading" class="text-sm font-bold tracking-wide">
             Week at a glance
           </h2>
-          <p class="text-xs text-base-content/60">Compact wall-clock previews, Monday through Sunday.</p>
+          <p class="text-xs text-base-content/60">
+            Compact wall-clock previews, Monday through Sunday.
+          </p>
           <Show when={dropFeedback()}>
             {(feedback) => (
               <p
@@ -295,11 +331,16 @@ export default function WeekStrip(props: WeekStripProps) {
       </div>
 
       <div class="overflow-x-auto pb-1" data-testid="week-strip-scroll">
-        <div class="grid min-w-[700px] grid-cols-7 gap-2" role="list" aria-label="Week day previews">
+        <div
+          class="grid min-w-175 grid-cols-7 gap-2"
+          role="list"
+          aria-label="Week day previews"
+        >
           <For each={WEEKDAY_NAMES}>
             {(day) => {
               const blocks = () => blocksFor(day);
-              const oneOffBlocks = () => blocks().filter((block) => block.source === "one-off");
+              const oneOffBlocks = () =>
+                blocks().filter((block) => block.source === "one-off");
               const hasBlocks = () => blocks().length > 0;
               return (
                 <div
@@ -319,8 +360,17 @@ export default function WeekStrip(props: WeekStripProps) {
                 >
                   <div class="mb-1 flex items-center justify-between">
                     <span class="text-xs font-bold">{DAY_LABELS[day]}</span>
-                    <Show when={hasBlocks()} fallback={<span class="text-[10px] text-base-content/40">Empty</span>}>
-                      <span class="text-[10px] text-base-content/50">{blocks().length} blocks</span>
+                    <Show
+                      when={hasBlocks()}
+                      fallback={
+                        <span class="text-[10px] text-base-content/40">
+                          Empty
+                        </span>
+                      }
+                    >
+                      <span class="text-[10px] text-base-content/50">
+                        {blocks().length} blocks
+                      </span>
                     </Show>
                   </div>
                   <div class="relative h-20 overflow-hidden rounded border border-base-200 bg-base-200/30">
@@ -334,75 +384,110 @@ export default function WeekStrip(props: WeekStripProps) {
                     </For>
                     <For each={blocks()}>
                       {(block) => {
-                        const item = block.source === "one-off"
-                          ? props.store.doc.days[day].items.find((candidate) => candidate.id === block.id)
-                          : undefined;
+                        const item =
+                          block.source === "one-off"
+                            ? props.store.doc.days[day].items.find(
+                                (candidate) => candidate.id === block.id,
+                              )
+                            : undefined;
                         return (
                           <For each={splitTimelineSpan(block.start, block.end)}>
                             {(span) => (
-                            <button
-                              type="button"
-                              class={`absolute inset-x-0.5 overflow-hidden rounded-sm border px-0.5 text-left text-[8px] leading-tight ${
-                                block.source === "one-off"
-                                  ? ITEM_THEMES[block._tag].card
-                                  : block.source === "boundary"
-                                    ? "border-dashed border-info bg-info/20 text-info-content"
-                                    : block.source === "override"
-                                      ? "border-dotted border-secondary bg-secondary/25 text-secondary-content"
-                                      : "border-dashed border-base-content/40 bg-base-content/15 text-base-content/70"
-                              }`}
-                              classList={{
-                                "select-none": draggingItemKey() === `${day}:${item?.id}`,
-                              }}
-                              style={timelineBlockStyle(span)}
-                              disabled={block.source === "boundary"}
-                              draggable={block.source === "one-off"}
-                              aria-keyshortcuts={block.source === "one-off" ? "ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight R [ ]" : undefined}
-                              data-keyboard-item={item ? `${day}:${item.id}` : undefined}
-                              data-keyboard-surface="strip"
-                              onDragStart={(event) => {
-                                if (item) {
-                                  setDraggingItemKey(`${day}:${item.id}`);
-                                  beginDrag(event.dataTransfer, { kind: "day-item", item });
+                              <button
+                                type="button"
+                                class={`absolute inset-x-0.5 overflow-hidden rounded-sm border px-0.5 text-left text-[8px] leading-tight ${
+                                  block.source === "one-off"
+                                    ? ITEM_THEMES[block._tag].card
+                                    : block.source === "boundary"
+                                      ? "border-dashed border-info bg-info/20 text-info-content"
+                                      : block.source === "override"
+                                        ? "border-dotted border-secondary bg-secondary/25 text-secondary-content"
+                                        : "border-dashed border-base-content/40 bg-base-content/15 text-base-content/70"
+                                }`}
+                                classList={{
+                                  "select-none":
+                                    draggingItemKey() === `${day}:${item?.id}`,
+                                }}
+                                style={timelineBlockStyle(span)}
+                                disabled={block.source === "boundary"}
+                                draggable={block.source === "one-off"}
+                                aria-keyshortcuts={
+                                  block.source === "one-off"
+                                    ? "ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight R [ ]"
+                                    : undefined
                                 }
-                              }}
-                              onDragEnd={() => setDraggingItemKey(null)}
-                              onFocus={() => {
-                                const active = keyboardResize();
-                                if (!item || active?.day !== day || active.itemId !== item.id) {
-                                  setKeyboardResize(null);
+                                data-keyboard-item={
+                                  item ? `${day}:${item.id}` : undefined
                                 }
-                              }}
-                              onClick={() => handleBlockClick(day, block)}
-                              onKeyDown={(event) => {
-                                if (item && handleKeyboardBlock(event, day, item)) return;
-                                if (item && (event.key === "Enter" || event.key === " ")) {
-                                  event.preventDefault();
-                                  handleBlockClick(day, block);
-                                } else if (!item && (event.key === "Enter" || event.key === " ")) {
-                                  event.preventDefault();
-                                }
-                              }}
-                              title={`${block.source}: ${block._tag === "sleep" ? ITEM_THEMES.sleep.name : block.title ?? block._tag} (${minutesToTime(span.start)}–${minutesToTime(span.end)})`}
-                              aria-label={`${block.source} ${block._tag} ${minutesToTime(span.start)} to ${minutesToTime(span.end)}`}
-                            >
-                              <span>{ITEM_ICONS[block._tag]}</span>
-                              <Show when={span.end - span.start >= 45}>
-                                <span class="ml-0.5">{block.source === "boundary" ? "Boundary" : block._tag}</span>
-                              </Show>
-                            </button>
+                                data-keyboard-surface="strip"
+                                onDragStart={(event) => {
+                                  if (item) {
+                                    setDraggingItemKey(`${day}:${item.id}`);
+                                    beginDrag(event.dataTransfer, {
+                                      kind: "day-item",
+                                      item,
+                                    });
+                                  }
+                                }}
+                                onDragEnd={() => setDraggingItemKey(null)}
+                                onFocus={() => {
+                                  const active = keyboardResize();
+                                  if (
+                                    !item ||
+                                    active?.day !== day ||
+                                    active.itemId !== item.id
+                                  ) {
+                                    setKeyboardResize(null);
+                                  }
+                                }}
+                                onClick={() => handleBlockClick(day, block)}
+                                onKeyDown={(event) => {
+                                  if (
+                                    item &&
+                                    handleKeyboardBlock(event, day, item)
+                                  )
+                                    return;
+                                  if (
+                                    item &&
+                                    (event.key === "Enter" || event.key === " ")
+                                  ) {
+                                    event.preventDefault();
+                                    handleBlockClick(day, block);
+                                  } else if (
+                                    !item &&
+                                    (event.key === "Enter" || event.key === " ")
+                                  ) {
+                                    event.preventDefault();
+                                  }
+                                }}
+                                title={`${block.source}: ${block._tag === "sleep" ? ITEM_THEMES.sleep.name : (block.title ?? block._tag)} (${minutesToTime(span.start)}–${minutesToTime(span.end)})`}
+                                aria-label={`${block.source} ${block._tag} ${minutesToTime(span.start)} to ${minutesToTime(span.end)}`}
+                              >
+                                <span>{ITEM_ICONS[block._tag]}</span>
+                                <Show when={span.end - span.start >= 45}>
+                                  <span class="ml-0.5">
+                                    {block.source === "boundary"
+                                      ? "Boundary"
+                                      : block._tag}
+                                  </span>
+                                </Show>
+                              </button>
                             )}
                           </For>
                         );
                       }}
                     </For>
                     <Show when={!hasBlocks()}>
-                      <span class="absolute inset-0 flex items-center justify-center text-[9px] text-base-content/30">No occupancy</span>
+                      <span class="absolute inset-0 flex items-center justify-center text-[9px] text-base-content/30">
+                        No occupancy
+                      </span>
                     </Show>
                   </div>
                   <div class="mt-1 flex justify-between text-[9px] font-mono text-base-content/45">
                     <span>00:00</span>
-                    <span>{oneOffBlocks().length > 0 ? "editable" : "read-only"}</span>
+                    <span>
+                      {oneOffBlocks().length > 0 ? "editable" : "read-only"}
+                    </span>
                     <span>24:00</span>
                   </div>
                 </div>

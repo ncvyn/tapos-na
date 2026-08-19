@@ -17,7 +17,12 @@ import {
   previewDragOverDay,
   previewDropOnDay,
 } from "./drag";
-import { type Busy, type Event as CalendarEvent, type Sleep, type Todo } from "./schema";
+import {
+  type Busy,
+  type Event as CalendarEvent,
+  type Sleep,
+  type Todo,
+} from "./schema";
 
 const busy: Busy = {
   _tag: "busy",
@@ -73,7 +78,9 @@ describe("commitDropOnDay (day items)", () => {
     );
 
     expect(result).toEqual({ ok: true });
-    expect(adjustedDropMessage(preview)).toBe("Adjusted: placed at Tue 09:30–10:00");
+    expect(adjustedDropMessage(preview)).toBe(
+      "Adjusted: placed at Tue 09:30–10:00",
+    );
     expect(store.doc.days.tuesday.items[0]).toMatchObject({
       id: "busy-1",
       day: "tuesday",
@@ -132,7 +139,10 @@ describe("commitDropOnDay (day items)", () => {
       "tuesday",
     );
 
-    expect(result).toEqual({ ok: false, reason: expect.stringContaining("refused") });
+    expect(result).toEqual({
+      ok: false,
+      reason: expect.stringContaining("refused"),
+    });
     // Item stays exactly where it started, with its prior span intact.
     expect(store.doc.days.monday.items).toHaveLength(1);
     expect(store.doc.days.monday.items[0]).toEqual(busy);
@@ -203,7 +213,9 @@ describe("commitDropOnDay (day items)", () => {
     };
     store.addEvent("monday", event);
 
-    expect(commitDropOnDay(store, { kind: "day-item", item: event }, "thursday")).toEqual({
+    expect(
+      commitDropOnDay(store, { kind: "day-item", item: event }, "thursday"),
+    ).toEqual({
       ok: true,
     });
     expect(store.doc.days.thursday.items[0]).toMatchObject({
@@ -226,7 +238,9 @@ describe("commitDropOnDay (day items)", () => {
     };
     store.addSleep("monday", sleep);
 
-    expect(commitDropOnDay(store, { kind: "day-item", item: sleep }, "thursday")).toEqual({
+    expect(
+      commitDropOnDay(store, { kind: "day-item", item: sleep }, "thursday"),
+    ).toEqual({
       ok: true,
     });
     expect(store.doc.days.thursday.items[0]).toMatchObject({
@@ -263,7 +277,9 @@ describe("commitDropOnDay (day items)", () => {
     // Reload from the same storage layer as a fresh store.
     const reloaded = createCalendarStore(memoryLayer);
     await reloaded.load();
-    const moved = reloaded.doc.days.tuesday.items.find((i) => i.id === "busy-1");
+    const moved = reloaded.doc.days.tuesday.items.find(
+      (i) => i.id === "busy-1",
+    );
     expect(moved).toMatchObject({ day: "tuesday", start: 600, end: 660 });
     expect(reloaded.doc.days.monday.items).toHaveLength(0);
   });
@@ -287,7 +303,11 @@ describe("commitDropOnDay (todos)", () => {
     await store.load();
     store.addTodo(todo);
 
-    const result = commitDropOnDay(store, { kind: "todo", item: todo }, "friday");
+    const result = commitDropOnDay(
+      store,
+      { kind: "todo", item: todo },
+      "friday",
+    );
 
     expect(result).toEqual({ ok: true });
     expect(store.doc.todos[0].dueDate).toBe("friday");
@@ -298,7 +318,11 @@ describe("commitDropOnDay (todos)", () => {
     await store.load();
     store.addTodo({ ...todo, dueDate: "monday" });
 
-    commitDropOnDay(store, { kind: "todo", item: { ...todo, dueDate: "monday" } }, "monday");
+    commitDropOnDay(
+      store,
+      { kind: "todo", item: { ...todo, dueDate: "monday" } },
+      "monday",
+    );
 
     expect(store.doc.todos[0].dueDate).toBe("monday");
   });
@@ -308,7 +332,9 @@ describe("commitDropOnDay (todos)", () => {
     await store.load();
     store.addTodo(todo);
 
-    expect(previewDropOnDay(store, { kind: "todo", item: todo }, "friday")).toEqual({
+    expect(
+      previewDropOnDay(store, { kind: "todo", item: todo }, "friday"),
+    ).toEqual({
       kind: "todo",
       targetDay: "friday",
       accepted: true,
@@ -319,7 +345,9 @@ describe("commitDropOnDay (todos)", () => {
 
     expect(store.doc.todos[0]).toMatchObject(todo);
     expect(store.doc.todos[0].dueDate).toBe("friday");
-    expect(Object.values(store.doc.days).every((day) => day.items.length === 0)).toBe(true);
+    expect(
+      Object.values(store.doc.days).every((day) => day.items.length === 0),
+    ).toBe(true);
   });
 
   it("persists a dragged Todo due Week day", async () => {
@@ -328,13 +356,20 @@ describe("commitDropOnDay (todos)", () => {
     await store.load();
     store.addTodo(todo);
 
-    expect(commitDropOnDay(store, { kind: "todo", item: todo }, "friday")).toEqual({ ok: true });
+    expect(
+      commitDropOnDay(store, { kind: "todo", item: todo }, "friday"),
+    ).toEqual({ ok: true });
     vi.advanceTimersByTime(50);
 
     const reloaded = createCalendarStore(memoryLayer);
     await reloaded.load();
-    expect(reloaded.doc.todos[0]).toMatchObject({ id: "todo-1", dueDate: "friday" });
-    expect(Object.values(reloaded.doc.days).every((day) => day.items.length === 0)).toBe(true);
+    expect(reloaded.doc.todos[0]).toMatchObject({
+      id: "todo-1",
+      dueDate: "friday",
+    });
+    expect(
+      Object.values(reloaded.doc.days).every((day) => day.items.length === 0),
+    ).toBe(true);
   });
 });
 
@@ -352,7 +387,9 @@ describe("previewDropOnDay", () => {
       end: 600,
     });
 
-    expect(previewDropOnDay(store, { kind: "day-item", item: busy }, "tuesday")).toEqual({
+    expect(
+      previewDropOnDay(store, { kind: "day-item", item: busy }, "tuesday"),
+    ).toEqual({
       kind: "day-item",
       targetDay: "tuesday",
       accepted: true,
@@ -375,7 +412,9 @@ describe("previewDropOnDay", () => {
       end: 1440,
     });
 
-    expect(previewDropOnDay(store, { kind: "day-item", item: busy }, "tuesday")).toEqual({
+    expect(
+      previewDropOnDay(store, { kind: "day-item", item: busy }, "tuesday"),
+    ).toEqual({
       kind: "day-item",
       targetDay: "tuesday",
       accepted: false,

@@ -93,7 +93,8 @@ function zonedFormatter(timezone: string): Intl.DateTimeFormat {
 /** Local wall-clock parts (and weekday) of an instant in a timezone. */
 function formatParts(timezone: string, date: Date): ZonedParts {
   const parts = zonedFormatter(timezone).formatToParts(date);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  const get = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? "0";
   const year = Number(get("year"));
   const month = Number(get("month"));
   const day = Number(get("day"));
@@ -285,6 +286,7 @@ export function getZonedClockTime(
 
 function zonedClockFormat(timezone: string, date: Date): string {
   const parts = zonedFormatter(timezone).formatToParts(date);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  const get = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? "0";
   return `${get("hour")}:${get("minute")}:${get("second")}`;
 }

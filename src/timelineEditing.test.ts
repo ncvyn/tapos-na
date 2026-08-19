@@ -110,7 +110,9 @@ describe("keyboard timeline editing seam", () => {
   it("changes the selected resize edge by 15 minutes", () => {
     expect(keyboardResizeValue(item, "end", "ArrowDown")).toBe(615);
     expect(keyboardResizeValue(item, "start", "ArrowUp")).toBe(525);
-    expect(resolveKeyboardResize(createDay(), item, "end", "ArrowDown")).toEqual({
+    expect(
+      resolveKeyboardResize(createDay(), item, "end", "ArrowDown"),
+    ).toEqual({
       start: 540,
       end: 615,
       adjusted: false,
@@ -119,7 +121,9 @@ describe("keyboard timeline editing seam", () => {
 
   it("uses the resize resolver's minimum-duration and collision rules", () => {
     const shortItem = { ...item, start: 540, end: 555 };
-    expect(resolveKeyboardResize(createDay(), shortItem, "end", "ArrowUp")).toBeNull();
+    expect(
+      resolveKeyboardResize(createDay(), shortItem, "end", "ArrowUp"),
+    ).toBeNull();
 
     const day = createDay({
       template: {

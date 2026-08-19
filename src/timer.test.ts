@@ -5,11 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  computeSchedule,
-  type DaySchedule,
-  type WorkSegment,
-} from "./engine";
+import { computeSchedule, type DaySchedule, type WorkSegment } from "./engine";
 import { type CalendarDoc, type DayOfWeek, WEEKDAY_NAMES } from "./schema";
 import { createDefaultDoc } from "./storage";
 import { getWeekStartDate } from "./time";

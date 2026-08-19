@@ -5,7 +5,11 @@ import {
   type Day,
   type DayOfWeek,
 } from "./schema";
-import { getWeekDayOccupancy, spansOverlap, type EffectiveBlock } from "./occupancy";
+import {
+  getWeekDayOccupancy,
+  spansOverlap,
+  type EffectiveBlock,
+} from "./occupancy";
 
 export interface DayConflict {
   first: EffectiveBlock;
@@ -23,7 +27,11 @@ export function findDayConflict(
 ): DayConflict | null {
   const blocks = getWeekDayOccupancy(day, boundaryOccupancy).effectiveBlocks;
   for (let firstIndex = 0; firstIndex < blocks.length; firstIndex += 1) {
-    for (let secondIndex = firstIndex + 1; secondIndex < blocks.length; secondIndex += 1) {
+    for (
+      let secondIndex = firstIndex + 1;
+      secondIndex < blocks.length;
+      secondIndex += 1
+    ) {
       const first = blocks[firstIndex];
       const second = blocks[secondIndex];
       if (spansOverlap(first, second)) return { first, second };
@@ -33,7 +41,9 @@ export function findDayConflict(
 }
 
 /** Find the first conflict anywhere in a stored calendar document. */
-export function findCalendarConflict(doc: CalendarDoc): CalendarConflict | null {
+export function findCalendarConflict(
+  doc: CalendarDoc,
+): CalendarConflict | null {
   for (const day of WEEKDAY_NAMES) {
     const conflict = findDayConflict(
       doc.days[day],
@@ -48,7 +58,10 @@ function blockLabel(block: EffectiveBlock): string {
   return block.title ?? block._tag;
 }
 
-export function formatConflict(conflict: CalendarConflict | DayConflict, day?: DayOfWeek): string {
-  const location = "day" in conflict ? conflict.day : day ?? "this day";
+export function formatConflict(
+  conflict: CalendarConflict | DayConflict,
+  day?: DayOfWeek,
+): string {
+  const location = "day" in conflict ? conflict.day : (day ?? "this day");
   return `Blocks overlap on ${location}: ${blockLabel(conflict.first)} and ${blockLabel(conflict.second)}.`;
 }

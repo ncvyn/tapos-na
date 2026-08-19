@@ -9,7 +9,13 @@
  * timezone. No notifications anywhere.
  */
 
-import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  Show,
+} from "solid-js";
 import { WEEKDAY_NAMES } from "../schema";
 import { computeSchedule } from "../engine";
 import type { CalendarStore } from "../state";
@@ -56,7 +62,10 @@ export default function ClockBar(props: { store: CalendarStore }) {
   const isWork = () => current()?.segment._tag === "work";
   const progress = () =>
     liveState().totalMs > 0
-      ? Math.min(100, Math.max(0, (liveState().wastedMs / liveState().totalMs) * 100))
+      ? Math.min(
+          100,
+          Math.max(0, (liveState().wastedMs / liveState().totalMs) * 100),
+        )
       : 0;
 
   return (
@@ -100,10 +109,15 @@ export default function ClockBar(props: { store: CalendarStore }) {
 
           <Show when={liveState().status === "before"}>
             <span class="text-xs text-base-content/60">Up next</span>
-            <span class="text-sm font-medium">{segmentLabel(liveState().next)}</span>
+            <span class="text-sm font-medium">
+              {segmentLabel(liveState().next)}
+            </span>
             <span class="font-mono text-xs tabular-nums text-base-content/60">
               {minutesToTime(liveState().next?.segment.start ?? 0)} · in{" "}
-              {formatDuration((liveState().next?.startMs ?? liveState().nowMs) - liveState().nowMs)}
+              {formatDuration(
+                (liveState().next?.startMs ?? liveState().nowMs) -
+                  liveState().nowMs,
+              )}
             </span>
           </Show>
 

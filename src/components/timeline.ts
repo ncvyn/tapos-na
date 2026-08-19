@@ -15,7 +15,8 @@ export function timelineMinutesAt(
 ): number {
   if (rect.height <= 0) return 0;
   return Math.round(
-    Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * MINUTES_PER_DAY,
+    Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) *
+      MINUTES_PER_DAY,
   );
 }
 
@@ -42,14 +43,18 @@ export function shiftTimelineSpan(
     : originalEnd - originalStart;
 
   if (wraps) {
-    const start = ((requestedStart % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+    const start =
+      ((requestedStart % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
     return {
       start,
       end: (start + duration) % MINUTES_PER_DAY,
     };
   }
 
-  const start = Math.max(0, Math.min(MINUTES_PER_DAY - duration, requestedStart));
+  const start = Math.max(
+    0,
+    Math.min(MINUTES_PER_DAY - duration, requestedStart),
+  );
   return { start, end: start + duration };
 }
 
@@ -77,7 +82,9 @@ export function splitTimelineSpan(start: number, end: number): TimelineSpan[] {
 }
 
 export function timelinePercent(minutes: number): number {
-  return (Math.max(0, Math.min(MINUTES_PER_DAY, minutes)) / MINUTES_PER_DAY) * 100;
+  return (
+    (Math.max(0, Math.min(MINUTES_PER_DAY, minutes)) / MINUTES_PER_DAY) * 100
+  );
 }
 
 /** CSS positioning for a span; intentionally has no minimum height. */

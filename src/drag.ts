@@ -9,7 +9,11 @@
  */
 
 import { DAY_LABELS, type DayItem, type DayOfWeek, type Todo } from "./schema";
-import { refusalMessage, resolvePlacement, type ResolvedPlacement } from "./placement";
+import {
+  refusalMessage,
+  resolvePlacement,
+  type ResolvedPlacement,
+} from "./placement";
 import type { CalendarStore } from "./state";
 import { ITEM_ICONS, ITEM_THEMES } from "./components/itemStyles";
 import { minutesToTime } from "./time";
@@ -18,8 +22,7 @@ export const DRAG_MIME = "application/x-tapos-item";
 
 /** The in-flight drag. Day items carry their source day in `item.day`. */
 export type DragPayload =
-  | { kind: "day-item"; item: DayItem }
-  | { kind: "todo"; item: Todo };
+  { kind: "day-item"; item: DayItem } | { kind: "todo"; item: Todo };
 
 export type DropPreview =
   | {
@@ -65,11 +68,7 @@ export function getDragPayload(dt: DataTransfer | null): DragPayload | null {
 }
 
 /** Render a small fixed-size ghost following the cursor during a drag. */
-function setDragImage(
-  dt: DataTransfer | null,
-  label: string,
-  icon = "",
-): void {
+function setDragImage(dt: DataTransfer | null, label: string, icon = ""): void {
   if (!dt) return;
   const ghost = document.createElement("div");
   ghost.className =

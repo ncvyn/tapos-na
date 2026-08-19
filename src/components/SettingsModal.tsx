@@ -106,7 +106,9 @@ export default function SettingsModal(props: SettingsModalProps) {
               <div class="flex gap-2">
                 <select
                   class="select select-bordered select-sm w-1/2"
-                  value={COMMON_TIMEZONES.includes(timezone()) ? timezone() : ""}
+                  value={
+                    COMMON_TIMEZONES.includes(timezone()) ? timezone() : ""
+                  }
                   onChange={(e) => {
                     if (e.currentTarget.value) {
                       setTimezone(e.currentTarget.value);
@@ -153,7 +155,9 @@ export default function SettingsModal(props: SettingsModalProps) {
                 <select
                   class="select select-bordered select-sm w-full"
                   value={breakLength()}
-                  onChange={(e) => setBreakLength(Number(e.currentTarget.value))}
+                  onChange={(e) =>
+                    setBreakLength(Number(e.currentTarget.value))
+                  }
                 >
                   <For each={[5, 10, 15, 20, 30]}>
                     {(len) => <option value={len}>{len} min</option>}
@@ -183,9 +187,12 @@ export default function SettingsModal(props: SettingsModalProps) {
             <div class="form-control bg-base-200/50 p-3 rounded-lg">
               <label class="label cursor-pointer justify-between py-0">
                 <div>
-                  <span class="label-text font-medium">Mini-Focus (½ Pomodoro)</span>
+                  <span class="label-text font-medium">
+                    Mini-Focus (½ Pomodoro)
+                  </span>
                   <p class="text-xs text-base-content/60">
-                    Schedule half-sessions in free gaps smaller than standard work length.
+                    Schedule half-sessions in free gaps smaller than standard
+                    work length.
                   </p>
                 </div>
                 <input
@@ -211,8 +218,9 @@ export default function SettingsModal(props: SettingsModalProps) {
                 autocomplete="off"
               />
               <p class="text-xs text-base-content/60 mt-1">
-                Stored locally for the phase-2 R2 backend (TODO(r2)). No behavior
-                depends on it yet; it is never written to exported docs.
+                Stored locally for the phase-2 R2 backend (TODO(r2)). No
+                behavior depends on it yet; it is never written to exported
+                docs.
               </p>
             </div>
 

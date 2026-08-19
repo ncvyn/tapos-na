@@ -97,7 +97,8 @@ export function resolveLiveState(
   const weekStart = getWeekStartDate(timezone, nowMs);
   const refs = getSegmentRefs(schedule, timezone, weekStart);
 
-  const current = refs.find((r) => r.startMs <= nowMs && nowMs < r.endMs) ?? null;
+  const current =
+    refs.find((r) => r.startMs <= nowMs && nowMs < r.endMs) ?? null;
   const next = refs.find((r) => r.startMs > nowMs) ?? null;
 
   if (current !== null) {

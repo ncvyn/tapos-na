@@ -252,12 +252,25 @@ describe("state store & actions seam", () => {
 
       const move = keyboardMoveRequest("monday", busy, "ArrowDown");
       expect(move).not.toBeNull();
-      expect(store.moveDayItem("monday", busy, move!.targetDay, move!.start, move!.end)).toBe(true);
+      expect(
+        store.moveDayItem(
+          "monday",
+          busy,
+          move!.targetDay,
+          move!.start,
+          move!.end,
+        ),
+      ).toBe(true);
 
       const moved = store.doc.days.monday.items[0] as Busy;
       const resizeValue = keyboardResizeValue(moved, "end", "ArrowDown");
       expect(resizeValue).toBe(630);
-      expect(store.resizeDayItem("monday", moved, { edge: "end", value: resizeValue! })).toBe(true);
+      expect(
+        store.resizeDayItem("monday", moved, {
+          edge: "end",
+          value: resizeValue!,
+        }),
+      ).toBe(true);
 
       vi.advanceTimersByTime(50);
       const reloaded = createCalendarStore(memoryLayer);
@@ -354,7 +367,9 @@ describe("state store & actions seam", () => {
       const ok = store.moveDayItem("monday", busy, "tuesday", 540, 600);
       expect(ok).toBe(false);
       expect(store.doc.days.monday.items).toHaveLength(1);
-      expect(store.doc.days.tuesday.items.filter((i) => i.id === "busy-1")).toHaveLength(0);
+      expect(
+        store.doc.days.tuesday.items.filter((i) => i.id === "busy-1"),
+      ).toHaveLength(0);
     });
 
     it("resolves a same-day both-edge edit through the seam", async () => {
@@ -643,7 +658,11 @@ describe("state store & actions seam", () => {
         end: 420,
       });
 
-      store.updateTemplateSleep("tuesday", { id: "ts-1", start: 1320, end: 480 });
+      store.updateTemplateSleep("tuesday", {
+        id: "ts-1",
+        start: 1320,
+        end: 480,
+      });
       expect(store.doc.days.tuesday.template.sleep[0].start).toBe(1320);
 
       store.deleteTemplateSleep("tuesday", "ts-1");

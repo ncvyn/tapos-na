@@ -24,18 +24,21 @@ function docAt(weekIdentity = "2026-08-10"): CalendarDoc {
 
 describe("Week identity", () => {
   it("uses the local Monday across a UTC date boundary", () => {
-    expect(getWeekIdentity("Asia/Manila", Date.parse("2026-08-16T16:30:00Z"))).toBe(
-      MONDAY,
-    );
-    expect(getWeekIdentity("America/Los_Angeles", Date.parse("2026-08-17T06:30:00Z"))).toBe(
-      "2026-08-10",
-    );
+    expect(
+      getWeekIdentity("Asia/Manila", Date.parse("2026-08-16T16:30:00Z")),
+    ).toBe(MONDAY);
+    expect(
+      getWeekIdentity(
+        "America/Los_Angeles",
+        Date.parse("2026-08-17T06:30:00Z"),
+      ),
+    ).toBe("2026-08-10");
   });
 
   it("uses local calendar arithmetic around a DST transition", () => {
-    expect(getWeekIdentity("America/New_York", Date.parse("2026-03-09T04:00:00Z"))).toBe(
-      "2026-03-09",
-    );
+    expect(
+      getWeekIdentity("America/New_York", Date.parse("2026-03-09T04:00:00Z")),
+    ).toBe("2026-03-09");
   });
 });
 
@@ -48,14 +51,16 @@ describe("CalendarDoc rollover", () => {
         ...base.days,
         monday: {
           ...base.days.monday,
-          items: [{
-            _tag: "busy",
-            id: "old",
-            title: "Old",
-            day: "monday",
-            start: 600,
-            end: 660,
-          }],
+          items: [
+            {
+              _tag: "busy",
+              id: "old",
+              title: "Old",
+              day: "monday",
+              start: 600,
+              end: 660,
+            },
+          ],
         },
         sunday: {
           ...base.days.sunday,
@@ -63,23 +68,27 @@ describe("CalendarDoc rollover", () => {
             ...base.days.sunday.template,
             sleep: [{ id: "night", start: 1380, end: 420 }],
           },
-          items: [{
-            _tag: "sleep",
-            id: "exception",
-            day: "sunday",
-            start: 1380,
-            end: 300,
-          }],
+          items: [
+            {
+              _tag: "sleep",
+              id: "exception",
+              day: "sunday",
+              start: 1380,
+              end: 300,
+            },
+          ],
           sleepOverride: [{ start: 1380, end: 360 }],
         },
       },
-      todos: [{
-        _tag: "todo",
-        id: "todo",
-        title: "Old todo",
-        pomodoros: 1,
-        priority: "P0",
-      }],
+      todos: [
+        {
+          _tag: "todo",
+          id: "todo",
+          title: "Old todo",
+          pomodoros: 1,
+          priority: "P0",
+        },
+      ],
     };
 
     const rolled = rolloverCalendarDoc(doc, NEXT_MONDAY);
@@ -108,13 +117,15 @@ describe("CalendarDoc rollover", () => {
             ...base.days.sunday.template,
             sleep: [{ id: "night", start: 1380, end: 420 }],
           },
-          items: [{
-            _tag: "sleep",
-            id: "exception",
-            day: "sunday",
-            start: 1380,
-            end: 300,
-          }],
+          items: [
+            {
+              _tag: "sleep",
+              id: "exception",
+              day: "sunday",
+              start: 1380,
+              end: 300,
+            },
+          ],
         },
       },
     };
@@ -153,9 +164,14 @@ describe("CalendarDoc rollover", () => {
 
     expect(occupancy.occupiedIntervals).toContainEqual({ start: 0, end: 420 });
     expect(occupancy.freeSpans[0]).toEqual({ start: 420, end: 1440 });
-    expect(wouldCollide(day, { tag: "busy", start: 60, end: 120 }, undefined, boundary)).toBe(
-      true,
-    );
+    expect(
+      wouldCollide(
+        day,
+        { tag: "busy", start: 60, end: 120 },
+        undefined,
+        boundary,
+      ),
+    ).toBe(true);
 
     const scheduled = computeSchedule({ ...doc, boundaryOccupancy: boundary });
     expect(scheduled.monday.freeSpans[0]).toEqual({ start: 420, end: 1440 });
@@ -166,7 +182,9 @@ describe("CalendarDoc rollover", () => {
     const withoutIdentity = { ...doc } as Record<string, unknown>;
     delete withoutIdentity.weekIdentity;
     expect(decodeCalendarDoc(withoutIdentity)._tag).toBe("Left");
-    expect(decodeCalendarDoc({ ...doc, weekIdentity: "2026-08-18" })._tag).toBe("Left");
+    expect(decodeCalendarDoc({ ...doc, weekIdentity: "2026-08-18" })._tag).toBe(
+      "Left",
+    );
     expect(
       decodeCalendarDoc({
         ...doc,

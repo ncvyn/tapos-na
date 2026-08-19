@@ -31,14 +31,26 @@ describe("wouldCollide", () => {
 
   it("collides with a template busy block", () => {
     const day = createDay({
-      template: { busy: [{ id: "tb1", title: "Class", start: 570, end: 630 }], sleep: [] },
+      template: {
+        busy: [{ id: "tb1", title: "Class", start: 570, end: 630 }],
+        sleep: [],
+      },
     });
     expect(wouldCollide(day, BUSY_PLACEMENT)).toBe(true);
   });
 
   it("collides with a one-off event", () => {
     const day = createDay({
-      items: [{ _tag: "event", id: "e1", title: "Dr", day: "monday", start: 540, end: 600 }],
+      items: [
+        {
+          _tag: "event",
+          id: "e1",
+          title: "Dr",
+          day: "monday",
+          start: 540,
+          end: 600,
+        },
+      ],
     });
     expect(wouldCollide(day, BUSY_PLACEMENT)).toBe(true);
   });
@@ -60,7 +72,10 @@ describe("wouldCollide", () => {
 
   it("allows a back-to-back drop next to a template block", () => {
     const day = createDay({
-      template: { busy: [{ id: "tb1", title: "Class", start: 600, end: 660 }], sleep: [] },
+      template: {
+        busy: [{ id: "tb1", title: "Class", start: 600, end: 660 }],
+        sleep: [],
+      },
     });
     expect(wouldCollide(day, BUSY_PLACEMENT)).toBe(false);
   });
@@ -74,7 +89,16 @@ describe("wouldCollide", () => {
 
   it("ignores the moving item itself on its source day", () => {
     const day = createDay({
-      items: [{ _tag: "busy", id: "b1", title: "Me", day: "monday", start: 540, end: 600 }],
+      items: [
+        {
+          _tag: "busy",
+          id: "b1",
+          title: "Me",
+          day: "monday",
+          start: 540,
+          end: 600,
+        },
+      ],
     });
     // Same placement, same id: the item must not collide with itself.
     expect(wouldCollide(day, BUSY_PLACEMENT, "b1")).toBe(false);
@@ -82,14 +106,32 @@ describe("wouldCollide", () => {
 
   it("collides with a different item even when a moving id is passed", () => {
     const day = createDay({
-      items: [{ _tag: "busy", id: "b1", title: "Me", day: "monday", start: 540, end: 600 }],
+      items: [
+        {
+          _tag: "busy",
+          id: "b1",
+          title: "Me",
+          day: "monday",
+          start: 540,
+          end: 600,
+        },
+      ],
     });
     expect(wouldCollide(day, BUSY_PLACEMENT, "someone-else")).toBe(true);
   });
 
   it("checks a wrapping sleep placement against a forward block", () => {
     const day = createDay({
-      items: [{ _tag: "busy", id: "b1", title: "Class", day: "monday", start: 300, end: 600 }],
+      items: [
+        {
+          _tag: "busy",
+          id: "b1",
+          title: "Class",
+          day: "monday",
+          start: 300,
+          end: 600,
+        },
+      ],
     });
     expect(
       wouldCollide(day, { tag: "sleep", start: 1380, end: 420 }, "sleep-1"),

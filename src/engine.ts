@@ -181,7 +181,11 @@ export function computeDaySchedule(
         workDuration = miniFocusLength;
         isMiniFocus = true;
         countUsed = needed;
-      } else if (settings.miniFocus && gap >= miniFocusLength && needed >= 0.5) {
+      } else if (
+        settings.miniFocus &&
+        gap >= miniFocusLength &&
+        needed >= 0.5
+      ) {
         workDuration = miniFocusLength;
         isMiniFocus = true;
         countUsed = 0.5;

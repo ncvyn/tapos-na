@@ -19,8 +19,10 @@ export default function CalendarApp() {
   // Modal States
   const [itemModalOpen, setItemModalOpen] = createSignal(false);
   const [itemToEdit, setItemToEdit] = createSignal<DayItem | Todo | null>(null);
-  const [modalDefaultDay, setModalDefaultDay] = createSignal<DayOfWeek>("monday");
-  const [modalDefaultType, setModalDefaultType] = createSignal<ItemType>("busy");
+  const [modalDefaultDay, setModalDefaultDay] =
+    createSignal<DayOfWeek>("monday");
+  const [modalDefaultType, setModalDefaultType] =
+    createSignal<ItemType>("busy");
   const [modalDefaultStart, setModalDefaultStart] = createSignal(540);
   const [modalDefaultEnd, setModalDefaultEnd] = createSignal(600);
 
@@ -28,7 +30,8 @@ export default function CalendarApp() {
   const [importModalOpen, setImportModalOpen] = createSignal(false);
 
   const [templateModalOpen, setTemplateModalOpen] = createSignal(false);
-  const [templateModalDay, setTemplateModalDay] = createSignal<DayOfWeek>("monday");
+  const [templateModalDay, setTemplateModalDay] =
+    createSignal<DayOfWeek>("monday");
 
   // Pointer and HTML5 placement feedback surface here and auto-dismiss.
   const [dragNotice, setDragNotice] = createSignal<{
@@ -57,9 +60,7 @@ export default function CalendarApp() {
     defaultEnd = 600,
   ) => {
     setItemToEdit(null);
-    setModalDefaultDay(
-      day ?? getTodayWeekday(store.doc.settings.timezone),
-    );
+    setModalDefaultDay(day ?? getTodayWeekday(store.doc.settings.timezone));
     setModalDefaultType(defaultType ?? "busy");
     setModalDefaultStart(defaultStart);
     setModalDefaultEnd(defaultEnd);
@@ -94,7 +95,9 @@ export default function CalendarApp() {
       <header class="navbar bg-base-100 shadow-sm border-b border-base-300 px-4 sm:px-6">
         <div class="navbar-start gap-3">
           <div class="flex items-center gap-2">
-            <span class="text-xl font-bold tracking-tight text-primary">tapos-na</span>
+            <span class="text-xl font-bold tracking-tight text-primary">
+              tapos-na
+            </span>
             <span class="badge badge-sm badge-outline font-mono text-[10px] hidden sm:inline-flex">
               {store.doc.settings.timezone}
             </span>
@@ -161,7 +164,9 @@ export default function CalendarApp() {
       {/* Drag & drop refusal toast */}
       <Show when={dragNotice()}>
         <div class="fixed left-1/2 top-4 z-50 w-auto -translate-x-1/2">
-          <div class={`alert ${dragNotice()?.kind === "adjusted" ? "alert-warning" : "alert-error"} flex items-center gap-2 px-4 py-2 text-xs shadow-lg`}>
+          <div
+            class={`alert ${dragNotice()?.kind === "adjusted" ? "alert-warning" : "alert-error"} flex items-center gap-2 px-4 py-2 text-xs shadow-lg`}
+          >
             <span>{dragNotice()?.kind === "adjusted" ? "⚠️" : "⛔"}</span>
             <span>{dragNotice()?.message}</span>
             <button
@@ -194,15 +199,20 @@ export default function CalendarApp() {
 
       {/* Main Content Area */}
       <main class="flex-1 p-4 sm:p-6 mx-auto w-full max-w-7xl">
-        <Show when={store.isLoaded()} fallback={
-          <div class="flex items-center justify-center py-24 text-base-content/60">
-            <span class="loading loading-spinner loading-md mr-2"></span>
-            Loading calendar...
-          </div>
-        }>
+        <Show
+          when={store.isLoaded()}
+          fallback={
+            <div class="flex items-center justify-center py-24 text-base-content/60">
+              <span class="loading loading-spinner loading-md mr-2"></span>
+              Loading calendar...
+            </div>
+          }
+        >
           <WeekView
             store={store}
-            onOpenAddItem={(day, type, start, end) => handleOpenAddItem(day, type, start, end)}
+            onOpenAddItem={(day, type, start, end) =>
+              handleOpenAddItem(day, type, start, end)
+            }
             onOpenEditItem={handleOpenEditItem}
             onOpenTemplate={handleOpenTemplate}
             onDropRefused={(reason) => notifyPlacement(reason, "refused")}

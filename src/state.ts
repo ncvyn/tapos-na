@@ -175,7 +175,9 @@ export function createCalendarStore(
         "days",
         originalDay,
         "items",
-        doc.days[originalDay].items.filter((existing) => existing.id !== item.id),
+        doc.days[originalDay].items.filter(
+          (existing) => existing.id !== item.id,
+        ),
       );
       setDoc("days", targetDay, "items", [...doc.days[targetDay].items, item]);
     }
@@ -316,13 +318,10 @@ export function createCalendarStore(
       },
     };
     if (rejectConflict(day, candidate)) return false;
-    setDoc(
-      "days",
-      day,
-      "template",
-      "busy",
-      [...doc.days[day].template.busy, block],
-    );
+    setDoc("days", day, "template", "busy", [
+      ...doc.days[day].template.busy,
+      block,
+    ]);
     scheduleSave();
     return true;
   };
@@ -371,13 +370,10 @@ export function createCalendarStore(
       },
     };
     if (rejectConflict(day, candidate)) return false;
-    setDoc(
-      "days",
-      day,
-      "template",
-      "sleep",
-      [...doc.days[day].template.sleep, block],
-    );
+    setDoc("days", day, "template", "sleep", [
+      ...doc.days[day].template.sleep,
+      block,
+    ]);
     scheduleSave();
     return true;
   };

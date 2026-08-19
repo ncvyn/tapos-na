@@ -46,8 +46,7 @@ export const WeekIdentity = Schema.String.pipe(
       );
     },
     {
-      message: () =>
-        "must be a real Monday in canonical YYYY-MM-DD format",
+      message: () => "must be a real Monday in canonical YYYY-MM-DD format",
     },
   ),
 );
