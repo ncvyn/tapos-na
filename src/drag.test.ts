@@ -10,8 +10,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCalendarStore } from "./state";
 import { makeMemoryStorageLayer } from "./storage";
-import { commitDropOnDay } from "./drag";
-import { type Busy, type Todo } from "./schema";
+import {
+  adjustedDropMessage,
+  commitDropOnDay,
+  commitDropOnDayWithPreview,
+  previewDragOverDay,
+  previewDropOnDay,
+} from "./drag";
+import { type Busy, type Event as CalendarEvent, type Sleep, type Todo } from "./schema";
 
 const busy: Busy = {
   _tag: "busy",
@@ -60,13 +66,14 @@ describe("commitDropOnDay (day items)", () => {
       end: 570,
     });
 
-    const result = commitDropOnDay(
+    const { preview, result } = commitDropOnDayWithPreview(
       store,
       { kind: "day-item", item: busy },
       "tuesday",
     );
 
     expect(result).toEqual({ ok: true });
+    expect(adjustedDropMessage(preview)).toBe("Adjusted: placed at Tue 09:30–10:00");
     expect(store.doc.days.tuesday.items[0]).toMatchObject({
       id: "busy-1",
       day: "tuesday",
@@ -183,6 +190,53 @@ describe("commitDropOnDay (day items)", () => {
     expect(store.doc.days.tuesday.items).toHaveLength(0);
   });
 
+  it("moves an Event through the strip seam without changing its wall-clock span", async () => {
+    const store = createCalendarStore(makeMemoryStorageLayer());
+    await store.load();
+    const event: CalendarEvent = {
+      _tag: "event",
+      id: "event-1",
+      title: "Dentist",
+      day: "monday",
+      start: 600,
+      end: 690,
+    };
+    store.addEvent("monday", event);
+
+    expect(commitDropOnDay(store, { kind: "day-item", item: event }, "thursday")).toEqual({
+      ok: true,
+    });
+    expect(store.doc.days.thursday.items[0]).toMatchObject({
+      id: "event-1",
+      day: "thursday",
+      start: 600,
+      end: 690,
+    });
+  });
+
+  it("moves Sleep through the strip seam without changing its wall-clock span", async () => {
+    const store = createCalendarStore(makeMemoryStorageLayer());
+    await store.load();
+    const sleep: Sleep = {
+      _tag: "sleep",
+      id: "sleep-1",
+      day: "monday",
+      start: 1380,
+      end: 420,
+    };
+    store.addSleep("monday", sleep);
+
+    expect(commitDropOnDay(store, { kind: "day-item", item: sleep }, "thursday")).toEqual({
+      ok: true,
+    });
+    expect(store.doc.days.thursday.items[0]).toMatchObject({
+      id: "sleep-1",
+      day: "thursday",
+      start: 1380,
+      end: 420,
+    });
+  });
+
   it("persists an adjusted move and it survives a reload", async () => {
     const memoryLayer = makeMemoryStorageLayer();
     const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
@@ -247,5 +301,134 @@ describe("commitDropOnDay (todos)", () => {
     commitDropOnDay(store, { kind: "todo", item: { ...todo, dueDate: "monday" } }, "monday");
 
     expect(store.doc.todos[0].dueDate).toBe("monday");
+  });
+
+  it("reports that a todo changes only its due Week day", async () => {
+    const store = createCalendarStore(makeMemoryStorageLayer());
+    await store.load();
+    store.addTodo(todo);
+
+    expect(previewDropOnDay(store, { kind: "todo", item: todo }, "friday")).toEqual({
+      kind: "todo",
+      targetDay: "friday",
+      accepted: true,
+      dueDateChanged: true,
+    });
+
+    commitDropOnDay(store, { kind: "todo", item: todo }, "friday");
+
+    expect(store.doc.todos[0]).toMatchObject(todo);
+    expect(store.doc.todos[0].dueDate).toBe("friday");
+    expect(Object.values(store.doc.days).every((day) => day.items.length === 0)).toBe(true);
+  });
+
+  it("persists a dragged Todo due Week day", async () => {
+    const memoryLayer = makeMemoryStorageLayer();
+    const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+    await store.load();
+    store.addTodo(todo);
+
+    expect(commitDropOnDay(store, { kind: "todo", item: todo }, "friday")).toEqual({ ok: true });
+    vi.advanceTimersByTime(50);
+
+    const reloaded = createCalendarStore(memoryLayer);
+    await reloaded.load();
+    expect(reloaded.doc.todos[0]).toMatchObject({ id: "todo-1", dueDate: "friday" });
+    expect(Object.values(reloaded.doc.days).every((day) => day.items.length === 0)).toBe(true);
+  });
+});
+
+describe("previewDropOnDay", () => {
+  it("previews an adjusted Day item strip drop", async () => {
+    const store = createCalendarStore(makeMemoryStorageLayer());
+    await store.load();
+    store.addBusy("monday", busy);
+    store.addBusy("tuesday", {
+      _tag: "busy",
+      id: "busy-2",
+      title: "Work Shift",
+      day: "tuesday",
+      start: 540,
+      end: 600,
+    });
+
+    expect(previewDropOnDay(store, { kind: "day-item", item: busy }, "tuesday")).toEqual({
+      kind: "day-item",
+      targetDay: "tuesday",
+      accepted: true,
+      start: 600,
+      end: 660,
+      adjusted: true,
+    });
+  });
+
+  it("previews refusal without changing the source", async () => {
+    const store = createCalendarStore(makeMemoryStorageLayer());
+    await store.load();
+    store.addBusy("monday", busy);
+    store.addBusy("tuesday", {
+      _tag: "busy",
+      id: "wall",
+      title: "Full Day",
+      day: "tuesday",
+      start: 0,
+      end: 1440,
+    });
+
+    expect(previewDropOnDay(store, { kind: "day-item", item: busy }, "tuesday")).toEqual({
+      kind: "day-item",
+      targetDay: "tuesday",
+      accepted: false,
+      reason: expect.stringContaining("No 15-minute placement"),
+    });
+    expect(store.doc.days.monday.items).toEqual([busy]);
+  });
+});
+
+describe("previewDragOverDay", () => {
+  function dragEventFor(payload: object) {
+    const dataTransfer = {
+      getData: (_format: string) => JSON.stringify(payload),
+      dropEffect: "none" as DataTransfer["dropEffect"],
+    };
+    return {
+      dataTransfer,
+      preventDefault: vi.fn(),
+    } as unknown as DragEvent;
+  }
+
+  it("prevents the native default and advertises a valid move", async () => {
+    const store = createCalendarStore(makeMemoryStorageLayer());
+    await store.load();
+    store.addBusy("monday", busy);
+    const event = dragEventFor({ kind: "day-item", item: busy });
+
+    expect(previewDragOverDay(event, store, "wednesday")).toMatchObject({
+      accepted: true,
+      targetDay: "wednesday",
+    });
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(event.dataTransfer?.dropEffect).toBe("move");
+  });
+
+  it("advertises refusal for a full target Week day", async () => {
+    const store = createCalendarStore(makeMemoryStorageLayer());
+    await store.load();
+    store.addBusy("monday", busy);
+    store.addBusy("tuesday", {
+      _tag: "busy",
+      id: "wall",
+      title: "Full Day",
+      day: "tuesday",
+      start: 0,
+      end: 1440,
+    });
+    const event = dragEventFor({ kind: "day-item", item: busy });
+
+    expect(previewDragOverDay(event, store, "tuesday")).toMatchObject({
+      accepted: false,
+      targetDay: "tuesday",
+    });
+    expect(event.dataTransfer?.dropEffect).toBe("none");
   });
 });

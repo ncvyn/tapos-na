@@ -9,11 +9,11 @@ import {
 import { computeSchedule, type ScheduledSegment } from "../engine";
 import { getWeekDayOccupancy, type EffectiveBlock } from "../occupancy";
 import {
+  adjustedDropMessage,
   beginDrag,
-  commitDropOnDay,
+  commitDropOnDayWithPreview,
   getDragPayload,
-  resolveDayItemDrop,
-  wouldDropBeRefused,
+  previewDragOverDay,
 } from "../drag";
 import type { ResizeEdge } from "../placement";
 import { spansOverlap } from "../occupancy";
@@ -309,12 +309,9 @@ export default function WeekView(props: WeekViewProps) {
   };
 
   const handleColumnDragOver = (event: DragEvent, day: DayOfWeek) => {
-    const payload = getDragPayload(event.dataTransfer);
-    if (!payload) return;
-    event.preventDefault();
-    const refused = payload.kind === "day-item" && wouldDropBeRefused(props.store, payload, day);
-    event.dataTransfer!.dropEffect = refused ? "none" : "move";
-    setDropHighlight(refused ? null : day);
+    const preview = previewDragOverDay(event, props.store, day);
+    if (!preview) return;
+    setDropHighlight(preview.accepted ? day : null);
   };
 
   const handleColumnDrop = (event: DragEvent, day: DayOfWeek) => {
@@ -322,17 +319,12 @@ export default function WeekView(props: WeekViewProps) {
     setDropHighlight(null);
     const payload = getDragPayload(event.dataTransfer);
     if (!payload) return;
-    const preview = payload.kind === "day-item"
-      ? resolveDayItemDrop(props.store, payload.item, day)
-      : null;
-    const result = commitDropOnDay(props.store, payload, day);
+    const { preview, result } = commitDropOnDayWithPreview(props.store, payload, day);
     if (!result.ok) {
       props.onDropRefused?.(result.reason);
-    } else if (preview?.adjusted) {
-      props.onPlacementNotice?.(
-        `Adjusted: placed at ${DAY_LABELS[day]} ${minutesToTime(preview.start)}–${minutesToTime(preview.end)}`,
-        "adjusted",
-      );
+    } else {
+      const message = adjustedDropMessage(preview);
+      if (message) props.onPlacementNotice?.(message, "adjusted");
     }
   };
 

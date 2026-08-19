@@ -8,10 +8,11 @@
  * placement is committed.
  */
 
-import { type DayItem, type DayOfWeek, type Todo } from "./schema";
+import { DAY_LABELS, type DayItem, type DayOfWeek, type Todo } from "./schema";
 import { refusalMessage, resolvePlacement, type ResolvedPlacement } from "./placement";
 import type { CalendarStore } from "./state";
 import { ITEM_ICONS, ITEM_THEMES } from "./components/itemStyles";
+import { minutesToTime } from "./time";
 
 export const DRAG_MIME = "application/x-tapos-item";
 
@@ -19,6 +20,28 @@ export const DRAG_MIME = "application/x-tapos-item";
 export type DragPayload =
   | { kind: "day-item"; item: DayItem }
   | { kind: "todo"; item: Todo };
+
+export type DropPreview =
+  | {
+      kind: "day-item";
+      targetDay: DayOfWeek;
+      accepted: true;
+      start: number;
+      end: number;
+      adjusted: boolean;
+    }
+  | {
+      kind: "day-item";
+      targetDay: DayOfWeek;
+      accepted: false;
+      reason: string;
+    }
+  | {
+      kind: "todo";
+      targetDay: DayOfWeek;
+      accepted: true;
+      dueDateChanged: boolean;
+    };
 
 function setDragPayload(dt: DataTransfer | null, payload: DragPayload): void {
   if (!dt) return;
@@ -73,20 +96,6 @@ export function beginDrag(dt: DataTransfer | null, payload: DragPayload): void {
   setDragImage(dt, label, icon);
 }
 
-/**
- * Whether a drop of `payload` onto `targetDay` would be refused (no valid
- * placement exists). Used by drop targets to advertise `dropEffect` before the
- * drop happens. Todos never refuse — they only carry a due date.
- */
-export function wouldDropBeRefused(
-  store: CalendarStore,
-  payload: DragPayload,
-  targetDay: DayOfWeek,
-): boolean {
-  if (payload.kind === "todo") return false;
-  return resolveDayItemDrop(store, payload.item, targetDay) === null;
-}
-
 /** Resolve the shared placement preview for a day-item drop target. */
 export function resolveDayItemDrop(
   store: CalendarStore,
@@ -101,7 +110,59 @@ export function resolveDayItemDrop(
   );
 }
 
+/** Preview either kind of day drop without mutating the calendar. */
+export function previewDropOnDay(
+  store: CalendarStore,
+  payload: DragPayload,
+  targetDay: DayOfWeek,
+): DropPreview {
+  if (payload.kind === "todo") {
+    return {
+      kind: "todo",
+      targetDay,
+      accepted: true,
+      dueDateChanged: payload.item.dueDate !== targetDay,
+    };
+  }
+
+  const resolved = resolveDayItemDrop(store, payload.item, targetDay);
+  return resolved === null
+    ? {
+        kind: "day-item",
+        targetDay,
+        accepted: false,
+        reason: refusalMessage(targetDay),
+      }
+    : {
+        kind: "day-item",
+        targetDay,
+        accepted: true,
+        start: resolved.start,
+        end: resolved.end,
+        adjusted: resolved.adjusted,
+      };
+}
+
+/** Prepare a native drag-over event for either Week-day drop target. */
+export function previewDragOverDay(
+  event: DragEvent,
+  store: CalendarStore,
+  targetDay: DayOfWeek,
+): DropPreview | null {
+  const payload = getDragPayload(event.dataTransfer);
+  if (!payload) return null;
+  event.preventDefault();
+  const preview = previewDropOnDay(store, payload, targetDay);
+  event.dataTransfer!.dropEffect = preview.accepted ? "move" : "none";
+  return preview;
+}
+
 export type MoveResult = { ok: true } | { ok: false; reason: string };
+
+export interface DropCommit {
+  preview: DropPreview;
+  result: MoveResult;
+}
 
 /**
  * The single drop seam. Drop `payload` onto `targetDay` at the item's current
@@ -131,4 +192,25 @@ export function commitDropOnDay(
   return placed
     ? { ok: true }
     : { ok: false, reason: refusalMessage(targetDay) };
+}
+
+/** Return the preview and commit result so every drop target reports the same outcome. */
+export function commitDropOnDayWithPreview(
+  store: CalendarStore,
+  payload: DragPayload,
+  targetDay: DayOfWeek,
+): DropCommit {
+  const preview = previewDropOnDay(store, payload, targetDay);
+  return {
+    preview,
+    result: commitDropOnDay(store, payload, targetDay),
+  };
+}
+
+/** Describe an adjusted Day item result for the shared placement notice. */
+export function adjustedDropMessage(preview: DropPreview): string | null {
+  if (preview.kind !== "day-item" || !preview.accepted || !preview.adjusted) {
+    return null;
+  }
+  return `Adjusted: placed at ${DAY_LABELS[preview.targetDay]} ${minutesToTime(preview.start)}–${minutesToTime(preview.end)}`;
 }

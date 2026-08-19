@@ -3,11 +3,11 @@ import { DAY_LABELS, type DayItem, type DayOfWeek, WEEKDAY_NAMES } from "../sche
 import { getWeekDayOccupancy, type EffectiveBlock } from "../occupancy";
 import type { CalendarStore } from "../state";
 import {
+  adjustedDropMessage,
   beginDrag,
-  commitDropOnDay,
+  commitDropOnDayWithPreview,
   getDragPayload,
-  resolveDayItemDrop,
-  wouldDropBeRefused,
+  previewDragOverDay,
 } from "../drag";
 import { minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES } from "./itemStyles";
@@ -23,6 +23,11 @@ interface WeekStripProps {
 
 export default function WeekStrip(props: WeekStripProps) {
   const [dropHighlight, setDropHighlight] = createSignal<DayOfWeek | null>(null);
+  const [dropFeedback, setDropFeedback] = createSignal<{
+    day: DayOfWeek;
+    kind: "preview" | "refused";
+    message: string;
+  } | null>(null);
 
   const blocksFor = (day: DayOfWeek) =>
     getWeekDayOccupancy(
@@ -31,31 +36,47 @@ export default function WeekStrip(props: WeekStripProps) {
     ).effectiveBlocks;
 
   const handleDragOver = (event: DragEvent, day: DayOfWeek) => {
-    const payload = getDragPayload(event.dataTransfer);
-    if (!payload) return;
-    event.preventDefault();
-    const refused =
-      payload.kind === "day-item" && wouldDropBeRefused(props.store, payload, day);
-    event.dataTransfer!.dropEffect = refused ? "none" : "move";
-    setDropHighlight(refused ? null : day);
+    const preview = previewDragOverDay(event, props.store, day);
+    if (!preview) return;
+    if (!preview.accepted) {
+      setDropHighlight(null);
+      setDropFeedback({
+        day,
+        kind: "refused",
+        message: `Drop refused: ${preview.reason}`,
+      });
+      return;
+    }
+
+    setDropHighlight(day);
+    setDropFeedback({
+      day,
+      kind: "preview",
+      message:
+        preview.kind === "todo"
+          ? preview.dueDateChanged
+            ? `Todo due day: ${DAY_LABELS[day]}`
+            : `Todo already due ${DAY_LABELS[day]}`
+          : preview.kind === "day-item" && preview.accepted && preview.adjusted
+            ? `Adjusted preview: ${DAY_LABELS[day]} ${minutesToTime(preview.start)}–${minutesToTime(preview.end)}`
+            : preview.kind === "day-item" && preview.accepted
+              ? `Drop preview: ${DAY_LABELS[day]} ${minutesToTime(preview.start)}–${minutesToTime(preview.end)}`
+              : "Drop preview",
+    });
   };
 
   const handleDrop = (event: DragEvent, day: DayOfWeek) => {
     event.preventDefault();
     setDropHighlight(null);
+    setDropFeedback(null);
     const payload = getDragPayload(event.dataTransfer);
     if (!payload) return;
-    const preview = payload.kind === "day-item"
-      ? resolveDayItemDrop(props.store, payload.item, day)
-      : null;
-    const result = commitDropOnDay(props.store, payload, day);
+    const { preview, result } = commitDropOnDayWithPreview(props.store, payload, day);
     if (!result.ok) {
       props.onDropRefused?.(result.reason);
-    } else if (preview?.adjusted) {
-      props.onPlacementNotice?.(
-        `Adjusted: placed at ${DAY_LABELS[day]} ${minutesToTime(preview.start)}–${minutesToTime(preview.end)}`,
-        "adjusted",
-      );
+    } else {
+      const message = adjustedDropMessage(preview);
+      if (message) props.onPlacementNotice?.(message, "adjusted");
     }
   };
 
@@ -76,6 +97,17 @@ export default function WeekStrip(props: WeekStripProps) {
             Week at a glance
           </h2>
           <p class="text-xs text-base-content/60">Compact wall-clock previews, Monday through Sunday.</p>
+          <Show when={dropFeedback()}>
+            {(feedback) => (
+              <p
+                class={`mt-1 text-xs ${feedback().kind === "refused" ? "text-error" : "text-info-content"}`}
+                aria-live="polite"
+                data-testid="week-strip-drop-feedback"
+              >
+                {feedback().message}
+              </p>
+            )}
+          </Show>
         </div>
         <span class="hidden text-[10px] uppercase tracking-wider text-base-content/50 sm:inline">
           Busy days stay visible
@@ -101,6 +133,7 @@ export default function WeekStrip(props: WeekStripProps) {
                   onDrop={(event) => handleDrop(event, day)}
                   onDragLeave={() => {
                     if (dropHighlight() === day) setDropHighlight(null);
+                    if (dropFeedback()?.day === day) setDropFeedback(null);
                   }}
                   aria-label={`${DAY_LABELS[day]} ${hasBlocks() ? "busy" : "empty"}`}
                 >
