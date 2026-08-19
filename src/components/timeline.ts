@@ -53,6 +53,12 @@ export function shiftTimelineSpan(
   return { start, end: start + duration };
 }
 
+/** Choose the one-hour default for an empty timeline slot. */
+export function emptyTimelinePlacement(minutes: number): TimelineSpan {
+  const start = Math.min(snapTimelineMinutes(minutes), MINUTES_PER_DAY - 60);
+  return { start, end: start + 60 };
+}
+
 /** Split a wall-clock span into the non-wrapping pieces visible in a day. */
 export function splitTimelineSpan(start: number, end: number): TimelineSpan[] {
   const boundedStart = Math.max(0, Math.min(MINUTES_PER_DAY, start));

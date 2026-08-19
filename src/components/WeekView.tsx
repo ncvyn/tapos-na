@@ -18,14 +18,17 @@ import {
 import type { ResizeEdge } from "../placement";
 import { spansOverlap } from "../occupancy";
 import type { CalendarStore } from "../state";
-import { resolvePointerMove, resolvePointerResize } from "../timelineEditing";
+import {
+  pointerMoveSpan,
+  resolvePointerMove,
+  resolvePointerResize,
+} from "../timelineEditing";
 import { formatTimeSpan, getTodayWeekday, minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES, PRIORITY_BADGES } from "./itemStyles";
 import WeekStrip from "./WeekStrip";
 import {
-  shiftTimelineSpan,
+  emptyTimelinePlacement,
   splitTimelineSpan,
-  snapTimelineMinutes,
   timelineBlockStyle,
   timelineMinutesAt,
   timelinePercent,
@@ -165,15 +168,10 @@ export default function WeekView(props: WeekViewProps) {
     let resolved: ReturnType<typeof resolvePointerMove> | ReturnType<typeof resolvePointerResize> = null;
 
     if (interaction.mode === "move") {
-      const rawStart = pointerMinute - interaction.grabOffset;
-      const requestedStartValue =
-        interaction.item.start > interaction.item.end
-          ? snapTimelineMinutes(((rawStart % 1440) + 1440) % 1440)
-          : snapTimelineMinutes(rawStart);
-      const shifted = shiftTimelineSpan(
-        interaction.item.start,
-        interaction.item.end,
-        requestedStartValue,
+      const shifted = pointerMoveSpan(
+        interaction.item,
+        pointerMinute,
+        interaction.grabOffset,
       );
       requestedStart = shifted.start;
       requestedEnd = shifted.end;
@@ -560,17 +558,17 @@ export default function WeekView(props: WeekViewProps) {
                       aria-label={`${DAY_LABELS[day]} timeline, 00:00 to 24:00`}
                       onClick={(event) => {
                         if (event.target !== event.currentTarget || suppressClick) return;
-                        const start = Math.min(
-                          snapTimelineMinutes(minuteAt(event.clientY)),
-                          1380,
+                        const emptyPlacement = emptyTimelinePlacement(
+                          minuteAt(event.clientY),
                         );
+                        const start = emptyPlacement.start;
                         const occupied = blocks().some((block) =>
-                          spansOverlap({ start, end: Math.min(1440, start + 1) }, block),
+                          spansOverlap({ start, end: start + 1 }, block),
                         ) || segments().some((segment) =>
-                          spansOverlap({ start, end: Math.min(1440, start + 1) }, segment),
+                          spansOverlap({ start, end: start + 1 }, segment),
                         );
                         if (!occupied) {
-                          props.onOpenAddItem(day, "busy", start, Math.min(1440, start + 60));
+                          props.onOpenAddItem(day, "busy", start, emptyPlacement.end);
                         }
                       }}
                       onDragOver={(event) => handleColumnDragOver(event, day)}

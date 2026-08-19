@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  emptyTimelinePlacement,
   shiftTimelineSpan,
   splitTimelineSpan,
   snapTimelineMinutes,
@@ -60,5 +61,10 @@ describe("shared timeline geometry", () => {
       start: 60,
       end: 540,
     });
+  });
+
+  it("provides a snapped one-hour placement for an empty slot", () => {
+    expect(emptyTimelinePlacement(548)).toEqual({ start: 555, end: 615 });
+    expect(emptyTimelinePlacement(1440)).toEqual({ start: 1380, end: 1440 });
   });
 });
