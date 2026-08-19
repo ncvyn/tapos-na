@@ -9,6 +9,7 @@ import {
   type Sleep,
   type Todo,
 } from "./schema";
+import { keyboardMoveRequest, keyboardResizeValue } from "./timelineEditing";
 
 describe("state store & actions seam", () => {
   beforeEach(() => {
@@ -234,6 +235,40 @@ describe("state store & actions seam", () => {
   });
 
   describe("moveDayItem (adjusted move seam)", () => {
+    it("persists keyboard movement and resize through the debounced store", async () => {
+      const memoryLayer = makeMemoryStorageLayer();
+      const store = createCalendarStore(memoryLayer, { debounceMs: 50 });
+      await store.load();
+
+      const busy: Busy = {
+        _tag: "busy",
+        id: "keyboard-1",
+        title: "Keyboard edit",
+        day: "monday",
+        start: 540,
+        end: 600,
+      };
+      store.addBusy("monday", busy);
+
+      const move = keyboardMoveRequest("monday", busy, "ArrowDown");
+      expect(move).not.toBeNull();
+      expect(store.moveDayItem("monday", busy, move!.targetDay, move!.start, move!.end)).toBe(true);
+
+      const moved = store.doc.days.monday.items[0] as Busy;
+      const resizeValue = keyboardResizeValue(moved, "end", "ArrowDown");
+      expect(resizeValue).toBe(630);
+      expect(store.resizeDayItem("monday", moved, { edge: "end", value: resizeValue! })).toBe(true);
+
+      vi.advanceTimersByTime(50);
+      const reloaded = createCalendarStore(memoryLayer);
+      await reloaded.load();
+      expect(reloaded.doc.days.monday.items[0]).toMatchObject({
+        id: "keyboard-1",
+        start: 555,
+        end: 630,
+      });
+    });
+
     it("moves cross-day preserving the wall-clock span when it fits", async () => {
       const memoryLayer = makeMemoryStorageLayer();
       const store = createCalendarStore(memoryLayer, { debounceMs: 50 });

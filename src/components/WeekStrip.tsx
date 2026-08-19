@@ -9,6 +9,14 @@ import {
   getDragPayload,
   previewDragOverDay,
 } from "../drag";
+import type { ResizeEdge } from "../placement";
+import {
+  isKeyboardResizeKey,
+  keyboardMoveRequest,
+  keyboardResizeValue,
+  resolveKeyboardMove,
+  resolveKeyboardResize,
+} from "../timelineEditing";
 import { minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES } from "./itemStyles";
 import { splitTimelineSpan, timelineBlockStyle } from "./timeline";
@@ -28,12 +36,31 @@ export default function WeekStrip(props: WeekStripProps) {
     kind: "preview" | "refused";
     message: string;
   } | null>(null);
+  const [keyboardResize, setKeyboardResize] = createSignal<{
+    day: DayOfWeek;
+    itemId: string;
+    edge: ResizeEdge;
+  } | null>(null);
+  const [draggingItemKey, setDraggingItemKey] = createSignal<string | null>(null);
+  let keyboardRoot: HTMLElement | undefined;
 
   const blocksFor = (day: DayOfWeek) =>
     getWeekDayOccupancy(
       props.store.doc.days[day],
       day === "monday" ? props.store.doc.boundaryOccupancy : [],
     ).effectiveBlocks;
+
+  const refocusKeyboardItem = (day: DayOfWeek, itemId: string) => {
+    requestAnimationFrame(() => {
+      const key = `${day}:${itemId}`;
+      const target = Array.from(
+        keyboardRoot?.querySelectorAll<HTMLElement>(
+          '[data-keyboard-item][data-keyboard-surface="strip"]',
+        ) ?? [],
+      ).find((element) => element.dataset.keyboardItem === key);
+      target?.focus();
+    });
+  };
 
   const handleDragOver = (event: DragEvent, day: DayOfWeek) => {
     const preview = previewDragOverDay(event, props.store, day);
@@ -80,6 +107,159 @@ export default function WeekStrip(props: WeekStripProps) {
     }
   };
 
+  const handleKeyboardResize = (
+    event: KeyboardEvent,
+    day: DayOfWeek,
+    item: DayItem,
+    edge: ResizeEdge,
+  ): boolean => {
+    if (!isKeyboardResizeKey(event.key)) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    setKeyboardResize({ day, itemId: item.id, edge });
+    const value = keyboardResizeValue(item, edge, event.key);
+    if (value === null) {
+      setDropFeedback({
+        day,
+        kind: "refused",
+        message: "Resize refused — the active edge cannot move beyond the Week day boundary.",
+      });
+      return true;
+    }
+
+    const resolved = resolveKeyboardResize(
+      props.store.doc.days[day],
+      item,
+      edge,
+      event.key,
+      day === "monday" ? props.store.doc.boundaryOccupancy : [],
+    );
+    if (resolved === null) {
+      props.onPlacementNotice?.(
+        "Resize refused — keep at least 15 minutes without overlapping.",
+        "refused",
+      );
+      return true;
+    }
+    const saved = props.store.resizeDayItem(day, item, {
+      edge,
+      value: edge === "start" ? resolved.start : resolved.end,
+    });
+    if (!saved) {
+      props.onPlacementNotice?.(props.store.errorMessage() ?? "Resize refused.", "refused");
+    } else if (resolved.adjusted) {
+      props.onPlacementNotice?.(
+        `Adjusted: resized at ${DAY_LABELS[day]} ${minutesToTime(resolved.start)}–${minutesToTime(resolved.end)}`,
+        "adjusted",
+      );
+    }
+    if (saved) refocusKeyboardItem(day, item.id);
+    return true;
+  };
+
+  const handleKeyboardBlock = (
+    event: KeyboardEvent,
+    day: DayOfWeek,
+    item: DayItem,
+  ): boolean => {
+    const activeResize = keyboardResize();
+    if (activeResize?.day === day && activeResize.itemId === item.id) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setKeyboardResize(null);
+        setDropFeedback(null);
+        return true;
+      }
+      if (event.key === "[" || event.key === "]") {
+        event.preventDefault();
+        event.stopPropagation();
+        setKeyboardResize({ ...activeResize, edge: event.key === "[" ? "start" : "end" });
+        setDropFeedback({
+          day,
+          kind: "preview",
+          message: `Resize mode: ${event.key === "[" ? "start" : "end"} edge active.`,
+        });
+        return true;
+      }
+      if (handleKeyboardResize(event, day, item, activeResize.edge)) return true;
+    }
+
+    if (
+      event.key.toLowerCase() === "r" &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      const active = keyboardResize();
+      const edge = active?.day === day && active.itemId === item.id && active.edge === "end"
+        ? "start"
+        : "end";
+      setKeyboardResize({ day, itemId: item.id, edge });
+      setDropFeedback({
+        day,
+        kind: "preview",
+        message: `Resize mode: ${edge} edge active. Use R to switch edges; press Escape to exit.`,
+      });
+      return true;
+    }
+
+    const request = keyboardMoveRequest(day, item, event.key, event.shiftKey);
+    if (request === null) {
+      if (
+        (!event.shiftKey &&
+          (event.key === "ArrowUp" || event.key === "ArrowDown")) ||
+        (event.shiftKey && (event.key === "ArrowLeft" || event.key === "ArrowRight"))
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        props.onPlacementNotice?.(
+          event.shiftKey
+            ? `Move refused — ${DAY_LABELS[day]} is at the Week boundary.`
+            : "Move refused — the item cannot move beyond the Week day boundary.",
+          "refused",
+        );
+        return true;
+      }
+      return false;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    const resolved = resolveKeyboardMove(
+      props.store.doc.days[request.targetDay],
+      item,
+      request,
+      request.targetDay === "monday" ? props.store.doc.boundaryOccupancy : [],
+    );
+    if (resolved === null) {
+      props.onPlacementNotice?.(
+        `Move refused: no valid 15-minute placement on ${request.targetDay}.`,
+        "refused",
+      );
+      return true;
+    }
+    const saved = props.store.moveDayItem(
+      day,
+      item,
+      request.targetDay,
+      resolved.start,
+      resolved.end,
+    );
+    if (!saved) {
+      props.onPlacementNotice?.(props.store.errorMessage() ?? "Move refused.", "refused");
+    } else if (resolved.adjusted) {
+      props.onPlacementNotice?.(
+        `Adjusted: placed at ${DAY_LABELS[request.targetDay]} ${minutesToTime(resolved.start)}–${minutesToTime(resolved.end)}`,
+        "adjusted",
+      );
+    }
+    if (saved) refocusKeyboardItem(request.targetDay, item.id);
+    return true;
+  };
+
   const handleBlockClick = (day: DayOfWeek, block: EffectiveBlock) => {
     if (block.source === "one-off") {
       const item = props.store.doc.days[day].items.find((candidate) => candidate.id === block.id);
@@ -90,7 +270,7 @@ export default function WeekStrip(props: WeekStripProps) {
   };
 
   return (
-    <section aria-labelledby="week-strip-heading" class="space-y-2">
+    <section ref={keyboardRoot} aria-labelledby="week-strip-heading" class="space-y-2">
       <div class="flex items-end justify-between gap-3">
         <div>
           <h2 id="week-strip-heading" class="text-sm font-bold tracking-wide">
@@ -153,9 +333,13 @@ export default function WeekStrip(props: WeekStripProps) {
                       )}
                     </For>
                     <For each={blocks()}>
-                      {(block) => (
-                        <For each={splitTimelineSpan(block.start, block.end)}>
-                          {(span) => (
+                      {(block) => {
+                        const item = block.source === "one-off"
+                          ? props.store.doc.days[day].items.find((candidate) => candidate.id === block.id)
+                          : undefined;
+                        return (
+                          <For each={splitTimelineSpan(block.start, block.end)}>
+                            {(span) => (
                             <button
                               type="button"
                               class={`absolute inset-x-0.5 overflow-hidden rounded-sm border px-0.5 text-left text-[8px] leading-tight ${
@@ -167,14 +351,38 @@ export default function WeekStrip(props: WeekStripProps) {
                                       ? "border-dotted border-secondary bg-secondary/25 text-secondary-content"
                                       : "border-dashed border-base-content/40 bg-base-content/15 text-base-content/70"
                               }`}
+                              classList={{
+                                "select-none": draggingItemKey() === `${day}:${item?.id}`,
+                              }}
                               style={timelineBlockStyle(span)}
                               disabled={block.source === "boundary"}
                               draggable={block.source === "one-off"}
+                              aria-keyshortcuts={block.source === "one-off" ? "ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight R [ ]" : undefined}
+                              data-keyboard-item={item ? `${day}:${item.id}` : undefined}
+                              data-keyboard-surface="strip"
                               onDragStart={(event) => {
-                                const item = props.store.doc.days[day].items.find((candidate) => candidate.id === block.id);
-                                if (item) beginDrag(event.dataTransfer, { kind: "day-item", item });
+                                if (item) {
+                                  setDraggingItemKey(`${day}:${item.id}`);
+                                  beginDrag(event.dataTransfer, { kind: "day-item", item });
+                                }
+                              }}
+                              onDragEnd={() => setDraggingItemKey(null)}
+                              onFocus={() => {
+                                const active = keyboardResize();
+                                if (!item || active?.day !== day || active.itemId !== item.id) {
+                                  setKeyboardResize(null);
+                                }
                               }}
                               onClick={() => handleBlockClick(day, block)}
+                              onKeyDown={(event) => {
+                                if (item && handleKeyboardBlock(event, day, item)) return;
+                                if (item && (event.key === "Enter" || event.key === " ")) {
+                                  event.preventDefault();
+                                  handleBlockClick(day, block);
+                                } else if (!item && (event.key === "Enter" || event.key === " ")) {
+                                  event.preventDefault();
+                                }
+                              }}
                               title={`${block.source}: ${block._tag === "sleep" ? ITEM_THEMES.sleep.name : block.title ?? block._tag} (${minutesToTime(span.start)}–${minutesToTime(span.end)})`}
                               aria-label={`${block.source} ${block._tag} ${minutesToTime(span.start)} to ${minutesToTime(span.end)}`}
                             >
@@ -183,9 +391,10 @@ export default function WeekStrip(props: WeekStripProps) {
                                 <span class="ml-0.5">{block.source === "boundary" ? "Boundary" : block._tag}</span>
                               </Show>
                             </button>
-                          )}
-                        </For>
-                      )}
+                            )}
+                          </For>
+                        );
+                      }}
                     </For>
                     <Show when={!hasBlocks()}>
                       <span class="absolute inset-0 flex items-center justify-center text-[9px] text-base-content/30">No occupancy</span>

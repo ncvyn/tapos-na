@@ -19,7 +19,12 @@ import type { ResizeEdge } from "../placement";
 import { spansOverlap } from "../occupancy";
 import type { CalendarStore } from "../state";
 import {
+  keyboardMoveRequest,
+  keyboardResizeValue,
+  isKeyboardResizeKey,
   pointerMoveSpan,
+  resolveKeyboardMove,
+  resolveKeyboardResize,
   resolvePointerMove,
   resolvePointerResize,
 } from "../timelineEditing";
@@ -96,6 +101,12 @@ type PointerInteraction = {
   moved: boolean;
 };
 
+type KeyboardResizeInteraction = {
+  day: DayOfWeek;
+  itemId: string;
+  edge: ResizeEdge;
+};
+
 export default function WeekView(props: WeekViewProps) {
   const todayWeekday = createMemo(() => getTodayWeekday(props.store.doc.settings.timezone));
   const weekSchedule = createMemo(() => computeSchedule(props.store.doc));
@@ -104,7 +115,11 @@ export default function WeekView(props: WeekViewProps) {
     createSignal<PointerInteraction | null>(null);
   const [pointerPreview, setPointerPreview] =
     createSignal<PointerPreview | null>(null);
+  const [keyboardResize, setKeyboardResize] =
+    createSignal<KeyboardResizeInteraction | null>(null);
+  const [draggingItemKey, setDraggingItemKey] = createSignal<string | null>(null);
   let timelineCanvas: HTMLDivElement | undefined;
+  let keyboardRoot: HTMLDivElement | undefined;
   const columnElements = new Map<DayOfWeek, HTMLElement>();
   let suppressClick = false;
 
@@ -120,6 +135,18 @@ export default function WeekView(props: WeekViewProps) {
       if (rect && clientX >= rect.left && clientX <= rect.right) return day;
     }
     return fallback;
+  };
+
+  const refocusKeyboardItem = (day: DayOfWeek, itemId: string) => {
+    requestAnimationFrame(() => {
+      const key = `${day}:${itemId}`;
+      const target = Array.from(
+        keyboardRoot?.querySelectorAll<HTMLElement>(
+          '[data-keyboard-item][data-keyboard-surface="timeline"]',
+        ) ?? [],
+      ).find((element) => element.dataset.keyboardItem === key);
+      target?.focus();
+    });
   };
 
   const placementMessage = (
@@ -156,6 +183,7 @@ export default function WeekView(props: WeekViewProps) {
       }
       event.preventDefault();
       setPointerInteraction({ ...interaction, moved: true });
+      setDraggingItemKey(`${interaction.sourceDay}:${interaction.item.id}`);
     }
 
     const targetDay =
@@ -240,6 +268,7 @@ export default function WeekView(props: WeekViewProps) {
           ? (pointerMinute - item.start + 1440) % 1440
           : pointerMinute - span.start
         : 0;
+    setKeyboardResize(null);
     setPointerInteraction({
       pointerId: event.pointerId,
       mode: edge === undefined ? "move" : "resize",
@@ -260,6 +289,7 @@ export default function WeekView(props: WeekViewProps) {
     const interaction = pointerInteraction();
     if (!interaction || interaction.pointerId !== event.pointerId) return;
     if (!interaction.moved) {
+      setDraggingItemKey(null);
       setPointerInteraction(null);
       setPointerPreview(null);
       return;
@@ -299,6 +329,7 @@ export default function WeekView(props: WeekViewProps) {
     }, 0);
     setPointerInteraction(null);
     setPointerPreview(null);
+    setDraggingItemKey(null);
   };
 
   const cancelPointerInteraction = (event: PointerEvent) => {
@@ -306,6 +337,180 @@ export default function WeekView(props: WeekViewProps) {
     if (!interaction || interaction.pointerId !== event.pointerId) return;
     setPointerInteraction(null);
     setPointerPreview(null);
+    setDraggingItemKey(null);
+  };
+
+  const handleKeyboardResize = (
+    event: KeyboardEvent,
+    day: DayOfWeek,
+    item: DayItem,
+    edge: ResizeEdge,
+  ): boolean => {
+    const value = keyboardResizeValue(item, edge, event.key);
+    if (!isKeyboardResizeKey(event.key)) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    setKeyboardResize({ day, itemId: item.id, edge });
+
+    if (value === null) {
+      props.onPlacementNotice?.(
+        "Resize refused — the active edge cannot move beyond the Week day boundary.",
+        "refused",
+      );
+      return true;
+    }
+
+    const resolved = resolveKeyboardResize(
+      props.store.doc.days[day],
+      item,
+      edge,
+      event.key,
+      boundaryFor(day),
+    );
+    if (resolved === null) {
+      props.onPlacementNotice?.(
+        "Resize refused — keep at least 15 minutes without overlapping.",
+        "refused",
+      );
+      return true;
+    }
+
+    const saved = props.store.resizeDayItem(day, item, {
+      edge,
+      value: edge === "start" ? resolved.start : resolved.end,
+    });
+    if (!saved) {
+      props.onPlacementNotice?.(
+        props.store.errorMessage() ?? "Resize refused.",
+        "refused",
+      );
+    } else if (resolved.adjusted) {
+      props.onPlacementNotice?.(
+        placementMessage(
+          "resize",
+          day,
+          resolved.start,
+          resolved.end,
+          true,
+          item.start,
+          item.end,
+        ),
+        "adjusted",
+      );
+    }
+    if (saved) refocusKeyboardItem(day, item.id);
+    return true;
+  };
+
+  const handleKeyboardBlock = (
+    event: KeyboardEvent,
+    day: DayOfWeek,
+    item: DayItem,
+  ): boolean => {
+    const activeResize = keyboardResize();
+    if (activeResize?.day === day && activeResize.itemId === item.id) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setKeyboardResize(null);
+        return true;
+      }
+      if (event.key === "[" || event.key === "]") {
+        event.preventDefault();
+        event.stopPropagation();
+        setKeyboardResize({
+          ...activeResize,
+          edge: event.key === "[" ? "start" : "end",
+        });
+        return true;
+      }
+      if (handleKeyboardResize(event, day, item, activeResize.edge)) return true;
+    }
+
+    if (
+      event.key.toLowerCase() === "r" &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      const active = keyboardResize();
+      setKeyboardResize({
+        day,
+        itemId: item.id,
+        edge: active?.day === day && active.itemId === item.id && active.edge === "end"
+          ? "start"
+          : "end",
+      });
+      return true;
+    }
+
+    const request = keyboardMoveRequest(day, item, event.key, event.shiftKey);
+    if (request === null) {
+      if (
+        (!event.shiftKey &&
+          (event.key === "ArrowUp" || event.key === "ArrowDown")) ||
+        (event.shiftKey &&
+          (event.key === "ArrowLeft" || event.key === "ArrowRight"))
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        props.onPlacementNotice?.(
+          event.shiftKey
+            ? `Move refused — ${DAY_LABELS[day]} is at the Week boundary.`
+            : "Move refused — the item cannot move beyond the Week day boundary.",
+          "refused",
+        );
+        return true;
+      }
+      return false;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    const resolved = resolveKeyboardMove(
+      props.store.doc.days[request.targetDay],
+      item,
+      request,
+      boundaryFor(request.targetDay),
+    );
+    if (resolved === null) {
+      props.onPlacementNotice?.(
+        `Move refused: no valid 15-minute placement on ${request.targetDay}.`,
+        "refused",
+      );
+      return true;
+    }
+
+    const saved = props.store.moveDayItem(
+      day,
+      item,
+      request.targetDay,
+      resolved.start,
+      resolved.end,
+    );
+    if (!saved) {
+      props.onPlacementNotice?.(
+        props.store.errorMessage() ?? "Move refused.",
+        "refused",
+      );
+    } else if (resolved.adjusted) {
+      props.onPlacementNotice?.(
+        placementMessage(
+          "move",
+          request.targetDay,
+          resolved.start,
+          resolved.end,
+          true,
+          request.start,
+          request.end,
+        ),
+        "adjusted",
+      );
+    }
+    if (saved) refocusKeyboardItem(request.targetDay, item.id);
+    return true;
   };
 
   const handleColumnDragOver = (event: DragEvent, day: DayOfWeek) => {
@@ -365,12 +570,28 @@ export default function WeekView(props: WeekViewProps) {
             } ${isInteractive(block) ? "cursor-pointer" : "cursor-default"} z-20`}
             style={timelineBlockStyle(span)}
             draggable={block.source === "one-off"}
-            classList={{ "touch-none": block.source === "one-off" }}
+            classList={{
+              "touch-none": block.source === "one-off",
+              "select-none": draggingItemKey() === `${day}:${item?.id}`,
+            }}
             role={isInteractive(block) ? "button" : undefined}
             aria-readonly={block.source !== "one-off"}
+            aria-keyshortcuts={block.source === "one-off" ? "ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight R [ ]" : undefined}
+            data-keyboard-item={item ? `${day}:${item.id}` : undefined}
+            data-keyboard-surface="timeline"
             tabIndex={isInteractive(block) ? 0 : undefined}
             onDragStart={(event) => {
-              if (item) beginDrag(event.dataTransfer, { kind: "day-item", item });
+              if (item) {
+                setDraggingItemKey(`${day}:${item.id}`);
+                beginDrag(event.dataTransfer, { kind: "day-item", item });
+              }
+            }}
+            onDragEnd={() => setDraggingItemKey(null)}
+            onFocus={() => {
+              const active = keyboardResize();
+              if (!item || active?.day !== day || active.itemId !== item.id) {
+                setKeyboardResize(null);
+              }
             }}
             onPointerDown={(event) => {
               if (item) beginPointerInteraction(event, day, item, span);
@@ -380,9 +601,12 @@ export default function WeekView(props: WeekViewProps) {
               handleBlockClick(day, block);
             }}
             onKeyDown={(event) => {
-              if (isInteractive(block) && (event.key === "Enter" || event.key === " ")) {
+              if (item && handleKeyboardBlock(event, day, item)) return;
+              if (item && (event.key === "Enter" || event.key === " ")) {
                 event.preventDefault();
                 handleBlockClick(day, block);
+              } else if (!item && isInteractive(block) && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
               }
             }}
             title={`${sourceLabel(block.source)}: ${continuation ? "Sleep continuation" : blockName(block)} (${formatTimeSpan(span.start, span.end)})`}
@@ -396,6 +620,17 @@ export default function WeekView(props: WeekViewProps) {
                 title="Resize start"
                 onPointerDown={(event) => {
                   if (item) beginPointerInteraction(event, day, item, span, "start");
+                }}
+                onKeyDown={(event) => {
+                  const active = keyboardResize();
+                  if (item) {
+                    handleKeyboardResize(
+                      event,
+                      day,
+                      item,
+                      active?.day === day && active.itemId === item.id ? active.edge : "start",
+                    );
+                  }
                 }}
                 onClick={(event) => event.stopPropagation()}
               />
@@ -423,6 +658,17 @@ export default function WeekView(props: WeekViewProps) {
                 title="Resize end"
                 onPointerDown={(event) => {
                   if (item) beginPointerInteraction(event, day, item, span, "end");
+                }}
+                onKeyDown={(event) => {
+                  const active = keyboardResize();
+                  if (item) {
+                    handleKeyboardResize(
+                      event,
+                      day,
+                      item,
+                      active?.day === day && active.itemId === item.id ? active.edge : "end",
+                    );
+                  }
                 }}
                 onClick={(event) => event.stopPropagation()}
               />
@@ -471,7 +717,7 @@ export default function WeekView(props: WeekViewProps) {
   };
 
   return (
-    <div class="space-y-6">
+    <div ref={keyboardRoot} class="space-y-6">
       <WeekStrip
         store={props.store}
         onOpenEditItem={props.onOpenEditItem}
@@ -501,6 +747,17 @@ export default function WeekView(props: WeekViewProps) {
               data-testid="timeline-preview-status"
             >
               {preview().message}
+            </div>
+          )}
+        </Show>
+        <Show when={keyboardResize()}>
+          {(resize) => (
+            <div
+              class="rounded-md border border-secondary/40 bg-secondary/10 px-3 py-2 text-xs text-secondary-content"
+              aria-live="polite"
+              data-testid="keyboard-resize-status"
+            >
+              Resize mode: {resize().edge} edge active. Use ArrowUp/ArrowDown to adjust by 15 minutes; press R to switch edges or Escape to exit.
             </div>
           )}
         </Show>
