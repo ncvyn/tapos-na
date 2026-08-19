@@ -6,9 +6,9 @@ import {
   beginDrag,
   commitDropOnDay,
   getDragPayload,
+  resolveDayItemDrop,
   wouldDropBeRefused,
 } from "../drag";
-import { resolvePlacement } from "../placement";
 import { minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES } from "./itemStyles";
 import { splitTimelineSpan, timelineBlockStyle } from "./timeline";
@@ -46,12 +46,7 @@ export default function WeekStrip(props: WeekStripProps) {
     const payload = getDragPayload(event.dataTransfer);
     if (!payload) return;
     const preview = payload.kind === "day-item"
-      ? resolvePlacement(
-          props.store.doc.days[day],
-          { tag: payload.item._tag, start: payload.item.start, end: payload.item.end },
-          payload.item.id,
-          day === "monday" ? props.store.doc.boundaryOccupancy : [],
-        )
+      ? resolveDayItemDrop(props.store, payload.item, day)
       : null;
     const result = commitDropOnDay(props.store, payload, day);
     if (!result.ok) {

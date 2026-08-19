@@ -9,7 +9,7 @@
  */
 
 import { type DayItem, type DayOfWeek, type Todo } from "./schema";
-import { refusalMessage, resolvePlacement } from "./placement";
+import { refusalMessage, resolvePlacement, type ResolvedPlacement } from "./placement";
 import type { CalendarStore } from "./state";
 import { ITEM_ICONS, ITEM_THEMES } from "./components/itemStyles";
 
@@ -84,13 +84,20 @@ export function wouldDropBeRefused(
   targetDay: DayOfWeek,
 ): boolean {
   if (payload.kind === "todo") return false;
-  return (
-    resolvePlacement(
-      store.doc.days[targetDay],
-      { tag: payload.item._tag, start: payload.item.start, end: payload.item.end },
-      payload.item.id,
-      targetDay === "monday" ? store.doc.boundaryOccupancy : [],
-    ) === null
+  return resolveDayItemDrop(store, payload.item, targetDay) === null;
+}
+
+/** Resolve the shared placement preview for a day-item drop target. */
+export function resolveDayItemDrop(
+  store: CalendarStore,
+  item: DayItem,
+  targetDay: DayOfWeek,
+): ResolvedPlacement | null {
+  return resolvePlacement(
+    store.doc.days[targetDay],
+    { tag: item._tag, start: item.start, end: item.end },
+    item.id,
+    targetDay === "monday" ? store.doc.boundaryOccupancy : [],
   );
 }
 

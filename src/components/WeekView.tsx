@@ -12,15 +12,13 @@ import {
   beginDrag,
   commitDropOnDay,
   getDragPayload,
+  resolveDayItemDrop,
   wouldDropBeRefused,
 } from "../drag";
-import {
-  resolvePlacement,
-  resolveResize,
-  type ResizeEdge,
-} from "../placement";
+import type { ResizeEdge } from "../placement";
 import { spansOverlap } from "../occupancy";
 import type { CalendarStore } from "../state";
+import { resolvePointerMove, resolvePointerResize } from "../timelineEditing";
 import { formatTimeSpan, getTodayWeekday, minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES, PRIORITY_BADGES } from "./itemStyles";
 import WeekStrip from "./WeekStrip";
@@ -164,7 +162,7 @@ export default function WeekView(props: WeekViewProps) {
     const pointerMinute = minuteAt(event.clientY);
     let requestedStart = interaction.item.start;
     let requestedEnd = interaction.item.end;
-    let resolved = null as ReturnType<typeof resolvePlacement> | ReturnType<typeof resolveResize>;
+    let resolved: ReturnType<typeof resolvePointerMove> | ReturnType<typeof resolvePointerResize> = null;
 
     if (interaction.mode === "move") {
       const rawStart = pointerMinute - interaction.grabOffset;
@@ -179,22 +177,19 @@ export default function WeekView(props: WeekViewProps) {
       );
       requestedStart = shifted.start;
       requestedEnd = shifted.end;
-      resolved = resolvePlacement(
+      resolved = resolvePointerMove(
         props.store.doc.days[targetDay],
-        { tag: interaction.item._tag, start: requestedStart, end: requestedEnd },
-        interaction.item.id,
+        interaction.item,
+        pointerMinute,
+        interaction.grabOffset,
         boundaryFor(targetDay),
       );
     } else {
-      resolved = resolveResize(
+      resolved = resolvePointerResize(
         props.store.doc.days[interaction.sourceDay],
-        {
-          tag: interaction.item._tag,
-          start: interaction.item.start,
-          end: interaction.item.end,
-          id: interaction.item.id,
-        },
-        { edge: interaction.edge!, value: snapTimelineMinutes(pointerMinute) },
+        interaction.item,
+        interaction.edge!,
+        pointerMinute,
         boundaryFor(interaction.sourceDay),
       );
     }
@@ -330,12 +325,7 @@ export default function WeekView(props: WeekViewProps) {
     const payload = getDragPayload(event.dataTransfer);
     if (!payload) return;
     const preview = payload.kind === "day-item"
-      ? resolvePlacement(
-          props.store.doc.days[day],
-          { tag: payload.item._tag, start: payload.item.start, end: payload.item.end },
-          payload.item.id,
-          boundaryFor(day),
-        )
+      ? resolveDayItemDrop(props.store, payload.item, day)
       : null;
     const result = commitDropOnDay(props.store, payload, day);
     if (!result.ok) {
