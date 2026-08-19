@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  shiftTimelineSpan,
   splitTimelineSpan,
+  snapTimelineMinutes,
+  timelineMinutesAt,
   timelineBlockStyle,
   timelinePercent,
 } from "./timeline";
@@ -26,5 +29,36 @@ describe("shared timeline geometry", () => {
 
   it("does not render zero-length spans", () => {
     expect(splitTimelineSpan(600, 600)).toEqual([]);
+  });
+
+  it("snaps pointer placements to the nearest 15-minute boundary", () => {
+    expect(snapTimelineMinutes(542)).toBe(540);
+    expect(snapTimelineMinutes(548)).toBe(555);
+    expect(snapTimelineMinutes(-10)).toBe(0);
+    expect(snapTimelineMinutes(1450)).toBe(1440);
+  });
+
+  it("maps pointer coordinates to the shared timeline scale", () => {
+    expect(timelineMinutesAt(250, { top: 100, height: 960 })).toBe(225);
+    expect(timelineMinutesAt(50, { top: 100, height: 960 })).toBe(0);
+    expect(timelineMinutesAt(1200, { top: 100, height: 960 })).toBe(1440);
+  });
+
+  it("preserves a forward span while keeping it inside the Week day", () => {
+    expect(shiftTimelineSpan(540, 600, 1380)).toEqual({
+      start: 1380,
+      end: 1440,
+    });
+    expect(shiftTimelineSpan(540, 600, -30)).toEqual({
+      start: 0,
+      end: 60,
+    });
+  });
+
+  it("preserves a wrapping sleep span when the start crosses midnight", () => {
+    expect(shiftTimelineSpan(1380, 420, 60)).toEqual({
+      start: 60,
+      end: 540,
+    });
   });
 });

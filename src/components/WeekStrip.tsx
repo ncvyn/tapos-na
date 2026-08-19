@@ -8,6 +8,7 @@ import {
   getDragPayload,
   wouldDropBeRefused,
 } from "../drag";
+import { resolvePlacement } from "../placement";
 import { minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES } from "./itemStyles";
 import { splitTimelineSpan, timelineBlockStyle } from "./timeline";
@@ -17,6 +18,7 @@ interface WeekStripProps {
   onOpenEditItem: (item: DayItem) => void;
   onOpenTemplate?: (day: DayOfWeek) => void;
   onDropRefused?: (reason: string) => void;
+  onPlacementNotice?: (message: string, kind: "adjusted" | "refused") => void;
 }
 
 export default function WeekStrip(props: WeekStripProps) {
@@ -43,8 +45,23 @@ export default function WeekStrip(props: WeekStripProps) {
     setDropHighlight(null);
     const payload = getDragPayload(event.dataTransfer);
     if (!payload) return;
+    const preview = payload.kind === "day-item"
+      ? resolvePlacement(
+          props.store.doc.days[day],
+          { tag: payload.item._tag, start: payload.item.start, end: payload.item.end },
+          payload.item.id,
+          day === "monday" ? props.store.doc.boundaryOccupancy : [],
+        )
+      : null;
     const result = commitDropOnDay(props.store, payload, day);
-    if (!result.ok) props.onDropRefused?.(result.reason);
+    if (!result.ok) {
+      props.onDropRefused?.(result.reason);
+    } else if (preview?.adjusted) {
+      props.onPlacementNotice?.(
+        `Adjusted: placed at ${DAY_LABELS[day]} ${minutesToTime(preview.start)}–${minutesToTime(preview.end)}`,
+        "adjusted",
+      );
+    }
   };
 
   const handleBlockClick = (day: DayOfWeek, block: EffectiveBlock) => {

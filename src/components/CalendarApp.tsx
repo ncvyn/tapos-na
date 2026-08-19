@@ -21,6 +21,8 @@ export default function CalendarApp() {
   const [itemToEdit, setItemToEdit] = createSignal<DayItem | Todo | null>(null);
   const [modalDefaultDay, setModalDefaultDay] = createSignal<DayOfWeek>("monday");
   const [modalDefaultType, setModalDefaultType] = createSignal<ItemType>("busy");
+  const [modalDefaultStart, setModalDefaultStart] = createSignal(540);
+  const [modalDefaultEnd, setModalDefaultEnd] = createSignal(600);
 
   const [settingsModalOpen, setSettingsModalOpen] = createSignal(false);
   const [importModalOpen, setImportModalOpen] = createSignal(false);
@@ -28,11 +30,17 @@ export default function CalendarApp() {
   const [templateModalOpen, setTemplateModalOpen] = createSignal(false);
   const [templateModalDay, setTemplateModalDay] = createSignal<DayOfWeek>("monday");
 
-  // Drag & drop feedback: refused drops surface here and auto-dismiss.
-  const [dragNotice, setDragNotice] = createSignal<string | null>(null);
+  // Pointer and HTML5 placement feedback surface here and auto-dismiss.
+  const [dragNotice, setDragNotice] = createSignal<{
+    message: string;
+    kind: "adjusted" | "refused";
+  } | null>(null);
   let dragNoticeTimer: ReturnType<typeof setTimeout> | null = null;
-  const notifyDropRefused = (reason: string) => {
-    setDragNotice(reason);
+  const notifyPlacement = (
+    message: string,
+    kind: "adjusted" | "refused" = "refused",
+  ) => {
+    setDragNotice({ message, kind });
     if (dragNoticeTimer !== null) clearTimeout(dragNoticeTimer);
     dragNoticeTimer = setTimeout(() => setDragNotice(null), 3500);
   };
@@ -42,12 +50,19 @@ export default function CalendarApp() {
     setTemplateModalOpen(true);
   };
 
-  const handleOpenAddItem = (day?: DayOfWeek, defaultType?: ItemType) => {
+  const handleOpenAddItem = (
+    day?: DayOfWeek,
+    defaultType?: ItemType,
+    defaultStart = 540,
+    defaultEnd = 600,
+  ) => {
     setItemToEdit(null);
     setModalDefaultDay(
       day ?? getTodayWeekday(store.doc.settings.timezone),
     );
     setModalDefaultType(defaultType ?? "busy");
+    setModalDefaultStart(defaultStart);
+    setModalDefaultEnd(defaultEnd);
     setItemModalOpen(true);
   };
 
@@ -146,9 +161,9 @@ export default function CalendarApp() {
       {/* Drag & drop refusal toast */}
       <Show when={dragNotice()}>
         <div class="fixed left-1/2 top-4 z-50 w-auto -translate-x-1/2">
-          <div class="alert alert-error text-xs shadow-lg px-4 py-2 flex items-center gap-2">
-            <span>⛔</span>
-            <span>{dragNotice()}</span>
+          <div class={`alert ${dragNotice()?.kind === "adjusted" ? "alert-warning" : "alert-error"} flex items-center gap-2 px-4 py-2 text-xs shadow-lg`}>
+            <span>{dragNotice()?.kind === "adjusted" ? "⚠️" : "⛔"}</span>
+            <span>{dragNotice()?.message}</span>
             <button
               type="button"
               class="btn btn-ghost btn-xs"
@@ -187,10 +202,11 @@ export default function CalendarApp() {
         }>
           <WeekView
             store={store}
-            onOpenAddItem={(day, type) => handleOpenAddItem(day, type)}
+            onOpenAddItem={(day, type, start, end) => handleOpenAddItem(day, type, start, end)}
             onOpenEditItem={handleOpenEditItem}
             onOpenTemplate={handleOpenTemplate}
-            onDropRefused={notifyDropRefused}
+            onDropRefused={(reason) => notifyPlacement(reason, "refused")}
+            onPlacementNotice={notifyPlacement}
           />
         </Show>
       </main>
@@ -203,6 +219,8 @@ export default function CalendarApp() {
         itemToEdit={itemToEdit()}
         defaultDay={modalDefaultDay()}
         defaultType={modalDefaultType()}
+        defaultStart={modalDefaultStart()}
+        defaultEnd={modalDefaultEnd()}
       />
 
       <SettingsModal

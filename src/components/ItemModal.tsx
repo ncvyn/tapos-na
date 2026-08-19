@@ -22,6 +22,8 @@ interface ItemModalProps {
   itemToEdit?: DayItem | Todo | null;
   defaultDay?: DayOfWeek;
   defaultType?: ItemType;
+  defaultStart?: number;
+  defaultEnd?: number;
 }
 
 export default function ItemModal(props: ItemModalProps) {
@@ -76,8 +78,8 @@ export default function ItemModal(props: ItemModalProps) {
         props.defaultDay ?? getTodayWeekday(props.store.doc.settings.timezone),
       );
       setTitle("");
-      setStart("09:00");
-      setEnd("10:00");
+      setStart(minutesToTime(props.defaultStart ?? 540));
+      setEnd(minutesToTime(props.defaultEnd ?? 600));
       setPomodoros(2);
       setPriority("P1");
       setDueDate("");

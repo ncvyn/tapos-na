@@ -14,13 +14,22 @@ import {
   getDragPayload,
   wouldDropBeRefused,
 } from "../drag";
+import {
+  resolvePlacement,
+  resolveResize,
+  type ResizeEdge,
+} from "../placement";
+import { spansOverlap } from "../occupancy";
 import type { CalendarStore } from "../state";
 import { formatTimeSpan, getTodayWeekday, minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES, PRIORITY_BADGES } from "./itemStyles";
 import WeekStrip from "./WeekStrip";
 import {
+  shiftTimelineSpan,
   splitTimelineSpan,
+  snapTimelineMinutes,
   timelineBlockStyle,
+  timelineMinutesAt,
   timelinePercent,
 } from "./timeline";
 
@@ -29,10 +38,13 @@ interface WeekViewProps {
   onOpenAddItem: (
     day?: DayOfWeek,
     defaultType?: "busy" | "event" | "sleep" | "todo",
+    defaultStart?: number,
+    defaultEnd?: number,
   ) => void;
   onOpenEditItem: (item: DayItem | Todo) => void;
   onOpenTemplate?: (day: DayOfWeek) => void;
   onDropRefused?: (reason: string) => void;
+  onPlacementNotice?: (message: string, kind: "adjusted" | "refused") => void;
 }
 
 const TIMELINE_HEIGHT = 960;
@@ -61,10 +73,247 @@ function isInteractive(block: EffectiveBlock): boolean {
   return block.source === "one-off" || block.source === "template" || block.source === "override";
 }
 
+type PointerPreview = {
+  mode: "move" | "resize";
+  day: DayOfWeek;
+  start: number;
+  end: number;
+  adjusted: boolean;
+  refused: boolean;
+  message: string;
+};
+
+type PointerInteraction = {
+  pointerId: number;
+  mode: "move" | "resize";
+  item: DayItem;
+  sourceDay: DayOfWeek;
+  edge?: ResizeEdge;
+  grabOffset: number;
+  startClientX: number;
+  startClientY: number;
+  moved: boolean;
+};
+
 export default function WeekView(props: WeekViewProps) {
   const todayWeekday = createMemo(() => getTodayWeekday(props.store.doc.settings.timezone));
   const weekSchedule = createMemo(() => computeSchedule(props.store.doc));
   const [dropHighlight, setDropHighlight] = createSignal<DayOfWeek | null>(null);
+  const [pointerInteraction, setPointerInteraction] =
+    createSignal<PointerInteraction | null>(null);
+  const [pointerPreview, setPointerPreview] =
+    createSignal<PointerPreview | null>(null);
+  let timelineCanvas: HTMLDivElement | undefined;
+  const columnElements = new Map<DayOfWeek, HTMLElement>();
+  let suppressClick = false;
+
+  const boundaryFor = (day: DayOfWeek) =>
+    day === "monday" ? props.store.doc.boundaryOccupancy : [];
+
+  const minuteAt = (clientY: number) =>
+    timelineMinutesAt(clientY, timelineCanvas?.getBoundingClientRect() ?? { top: 0, height: 0 });
+
+  const dayAt = (clientX: number, fallback: DayOfWeek): DayOfWeek => {
+    for (const day of WEEKDAY_NAMES) {
+      const rect = columnElements.get(day)?.getBoundingClientRect();
+      if (rect && clientX >= rect.left && clientX <= rect.right) return day;
+    }
+    return fallback;
+  };
+
+  const placementMessage = (
+    mode: "move" | "resize",
+    day: DayOfWeek,
+    start: number,
+    end: number,
+    adjusted: boolean,
+    requestedStart: number,
+    requestedEnd: number,
+  ): string => {
+    const placement = `${DAY_LABELS[day]} ${minutesToTime(start)}–${minutesToTime(end)}`;
+    if (!adjusted) return `${mode === "move" ? "Move" : "Resize"} preview: ${placement}`;
+    if (
+      mode === "move" &&
+      requestedEnd === end &&
+      requestedStart < start &&
+      end - start < requestedEnd - requestedStart
+    ) {
+      return `Adjusted: shortened to ${placement}`;
+    }
+    return `Adjusted: ${mode === "move" ? "placed" : "resized"} at ${placement}`;
+  };
+
+  const updatePointerPreview = (event: PointerEvent) => {
+    const interaction = pointerInteraction();
+    if (!interaction) return;
+    if (!interaction.moved) {
+      if (
+        Math.abs(event.clientX - interaction.startClientX) < 4 &&
+        Math.abs(event.clientY - interaction.startClientY) < 4
+      ) {
+        return;
+      }
+      event.preventDefault();
+      setPointerInteraction({ ...interaction, moved: true });
+    }
+
+    const targetDay =
+      interaction.mode === "resize"
+        ? interaction.sourceDay
+        : dayAt(event.clientX, interaction.sourceDay);
+    const pointerMinute = minuteAt(event.clientY);
+    let requestedStart = interaction.item.start;
+    let requestedEnd = interaction.item.end;
+    let resolved = null as ReturnType<typeof resolvePlacement> | ReturnType<typeof resolveResize>;
+
+    if (interaction.mode === "move") {
+      const rawStart = pointerMinute - interaction.grabOffset;
+      const requestedStartValue =
+        interaction.item.start > interaction.item.end
+          ? snapTimelineMinutes(((rawStart % 1440) + 1440) % 1440)
+          : snapTimelineMinutes(rawStart);
+      const shifted = shiftTimelineSpan(
+        interaction.item.start,
+        interaction.item.end,
+        requestedStartValue,
+      );
+      requestedStart = shifted.start;
+      requestedEnd = shifted.end;
+      resolved = resolvePlacement(
+        props.store.doc.days[targetDay],
+        { tag: interaction.item._tag, start: requestedStart, end: requestedEnd },
+        interaction.item.id,
+        boundaryFor(targetDay),
+      );
+    } else {
+      resolved = resolveResize(
+        props.store.doc.days[interaction.sourceDay],
+        {
+          tag: interaction.item._tag,
+          start: interaction.item.start,
+          end: interaction.item.end,
+          id: interaction.item.id,
+        },
+        { edge: interaction.edge!, value: snapTimelineMinutes(pointerMinute) },
+        boundaryFor(interaction.sourceDay),
+      );
+    }
+
+    if (resolved === null) {
+      setPointerPreview({
+        mode: interaction.mode,
+        day: targetDay,
+        start: interaction.item.start,
+        end: interaction.item.end,
+        adjusted: false,
+        refused: true,
+        message: `Drop refused: no valid 15-minute placement on ${targetDay}.`,
+      });
+      return;
+    }
+
+    setPointerPreview({
+      mode: interaction.mode,
+      day: targetDay,
+      start: resolved.start,
+      end: resolved.end,
+      adjusted: resolved.adjusted,
+      refused: false,
+      message: placementMessage(
+        interaction.mode,
+        targetDay,
+        resolved.start,
+        resolved.end,
+        resolved.adjusted,
+        requestedStart,
+        requestedEnd,
+      ),
+    });
+  };
+
+  const beginPointerInteraction = (
+    event: PointerEvent,
+    day: DayOfWeek,
+    item: DayItem,
+    span: { start: number; end: number },
+    edge?: ResizeEdge,
+  ) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.stopPropagation();
+    const pointerMinute = minuteAt(event.clientY);
+    const grabOffset =
+      edge === undefined
+        ? item.start > item.end
+          ? (pointerMinute - item.start + 1440) % 1440
+          : pointerMinute - span.start
+        : 0;
+    setPointerInteraction({
+      pointerId: event.pointerId,
+      mode: edge === undefined ? "move" : "resize",
+      item,
+      sourceDay: day,
+      edge,
+      grabOffset,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      moved: false,
+    });
+    setPointerPreview(null);
+    const target = event.currentTarget as HTMLElement;
+    if (target.setPointerCapture) target.setPointerCapture(event.pointerId);
+  };
+
+  const finishPointerInteraction = (event: PointerEvent) => {
+    const interaction = pointerInteraction();
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+    if (!interaction.moved) {
+      setPointerInteraction(null);
+      setPointerPreview(null);
+      return;
+    }
+    const preview = pointerPreview();
+    if (preview === null || preview.refused) {
+      props.onPlacementNotice?.(
+        preview?.message ?? "Drop refused: no valid 15-minute placement.",
+        "refused",
+      );
+    } else {
+      const saved =
+        interaction.mode === "move"
+          ? props.store.moveDayItem(
+              interaction.sourceDay,
+              interaction.item,
+              preview.day,
+              preview.start,
+              preview.end,
+            )
+          : props.store.resizeDayItem(interaction.sourceDay, interaction.item, {
+              edge: interaction.edge!,
+              value: interaction.edge === "start" ? preview.start : preview.end,
+            });
+      if (!saved) {
+        props.onPlacementNotice?.(
+          props.store.errorMessage() ?? "Placement refused.",
+          "refused",
+        );
+      } else if (preview.adjusted) {
+        props.onPlacementNotice?.(preview.message, "adjusted");
+      }
+    }
+    suppressClick = true;
+    setTimeout(() => {
+      suppressClick = false;
+    }, 0);
+    setPointerInteraction(null);
+    setPointerPreview(null);
+  };
+
+  const cancelPointerInteraction = (event: PointerEvent) => {
+    const interaction = pointerInteraction();
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+    setPointerInteraction(null);
+    setPointerPreview(null);
+  };
 
   const handleColumnDragOver = (event: DragEvent, day: DayOfWeek) => {
     const payload = getDragPayload(event.dataTransfer);
@@ -80,8 +329,23 @@ export default function WeekView(props: WeekViewProps) {
     setDropHighlight(null);
     const payload = getDragPayload(event.dataTransfer);
     if (!payload) return;
+    const preview = payload.kind === "day-item"
+      ? resolvePlacement(
+          props.store.doc.days[day],
+          { tag: payload.item._tag, start: payload.item.start, end: payload.item.end },
+          payload.item.id,
+          boundaryFor(day),
+        )
+      : null;
     const result = commitDropOnDay(props.store, payload, day);
-    if (!result.ok) props.onDropRefused?.(result.reason);
+    if (!result.ok) {
+      props.onDropRefused?.(result.reason);
+    } else if (preview?.adjusted) {
+      props.onPlacementNotice?.(
+        `Adjusted: placed at ${DAY_LABELS[day]} ${minutesToTime(preview.start)}–${minutesToTime(preview.end)}`,
+        "adjusted",
+      );
+    }
   };
 
   const blocksFor = (day: DayOfWeek) =>
@@ -91,6 +355,7 @@ export default function WeekView(props: WeekViewProps) {
     ).effectiveBlocks;
 
   const handleBlockClick = (day: DayOfWeek, block: EffectiveBlock) => {
+    if (suppressClick) return;
     if (block.source === "one-off") {
       const item = props.store.doc.days[day].items.find((candidate) => candidate.id === block.id);
       if (item) props.onOpenEditItem(item);
@@ -120,13 +385,20 @@ export default function WeekView(props: WeekViewProps) {
             } ${isInteractive(block) ? "cursor-pointer" : "cursor-default"} z-20`}
             style={timelineBlockStyle(span)}
             draggable={block.source === "one-off"}
+            classList={{ "touch-none": block.source === "one-off" }}
             role={isInteractive(block) ? "button" : undefined}
             aria-readonly={block.source !== "one-off"}
             tabIndex={isInteractive(block) ? 0 : undefined}
             onDragStart={(event) => {
               if (item) beginDrag(event.dataTransfer, { kind: "day-item", item });
             }}
-            onClick={() => handleBlockClick(day, block)}
+            onPointerDown={(event) => {
+              if (item) beginPointerInteraction(event, day, item, span);
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleBlockClick(day, block);
+            }}
             onKeyDown={(event) => {
               if (isInteractive(block) && (event.key === "Enter" || event.key === " ")) {
                 event.preventDefault();
@@ -135,7 +407,19 @@ export default function WeekView(props: WeekViewProps) {
             }}
             title={`${sourceLabel(block.source)}: ${continuation ? "Sleep continuation" : blockName(block)} (${formatTimeSpan(span.start, span.end)})`}
             aria-label={`${sourceLabel(block.source)} ${blockName(block)}, ${minutesToTime(span.start)} to ${minutesToTime(span.end)}`}
-          >
+            >
+            <Show when={item && (item.start < item.end || span.start === item.start)}>
+              <button
+                type="button"
+                class="absolute inset-x-0 top-0 z-30 h-2 cursor-ns-resize bg-transparent"
+                aria-label={`Resize ${blockName(block)} start`}
+                title="Resize start"
+                onPointerDown={(event) => {
+                  if (item) beginPointerInteraction(event, day, item, span, "start");
+                }}
+                onClick={(event) => event.stopPropagation()}
+              />
+            </Show>
             <div class="flex items-start gap-1 font-medium">
               <span>{ITEM_ICONS[block._tag]}</span>
               <span class="truncate">{continuation ? "Sleep continuation" : blockName(block)}</span>
@@ -144,6 +428,18 @@ export default function WeekView(props: WeekViewProps) {
               <span>{sourceLabel(block.source)}</span>
               <span>{minutesToTime(span.start)}–{minutesToTime(span.end)}</span>
             </div>
+            <Show when={item && (item.start < item.end || span.end === item.end)}>
+              <button
+                type="button"
+                class="absolute inset-x-0 bottom-0 z-30 h-2 cursor-ns-resize bg-transparent"
+                aria-label={`Resize ${blockName(block)} end`}
+                title="Resize end"
+                onPointerDown={(event) => {
+                  if (item) beginPointerInteraction(event, day, item, span, "end");
+                }}
+                onClick={(event) => event.stopPropagation()}
+              />
+            </Show>
             <Show when={item}>
               <button
                 type="button"
@@ -194,6 +490,7 @@ export default function WeekView(props: WeekViewProps) {
         onOpenEditItem={props.onOpenEditItem}
         onOpenTemplate={props.onOpenTemplate}
         onDropRefused={props.onDropRefused}
+        onPlacementNotice={props.onPlacementNotice}
       />
 
       <section aria-labelledby="week-timeline-heading" class="space-y-3">
@@ -209,6 +506,17 @@ export default function WeekView(props: WeekViewProps) {
             <span class="badge badge-sm border border-primary/60 bg-primary/20">Derived</span>
           </div>
         </div>
+        <Show when={pointerPreview()}>
+          {(preview) => (
+            <div
+              class={`rounded-md border px-3 py-2 text-xs ${preview().refused ? "border-error/40 bg-error/10 text-error" : preview().adjusted ? "border-warning/40 bg-warning/10 text-warning-content" : "border-info/40 bg-info/10 text-info-content"}`}
+              aria-live="polite"
+              data-testid="timeline-preview-status"
+            >
+              {preview().message}
+            </div>
+          )}
+        </Show>
 
         <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100 shadow-sm" data-testid="week-timeline-scroll">
           <div class="min-w-[1000px]">
@@ -232,7 +540,13 @@ export default function WeekView(props: WeekViewProps) {
               </For>
             </div>
 
-            <div class="grid grid-cols-[4.5rem_repeat(7,minmax(8.5rem,1fr))]">
+            <div
+              ref={timelineCanvas}
+              class="grid grid-cols-[4.5rem_repeat(7,minmax(8.5rem,1fr))]"
+              onPointerMove={updatePointerPreview}
+              onPointerUp={finishPointerInteraction}
+              onPointerCancel={cancelPointerInteraction}
+            >
               <div class="relative border-r border-base-300" style={{ height: `${TIMELINE_HEIGHT}px` }} aria-hidden="true">
                 <For each={TIME_LABELS}>
                   {(minute) => (
@@ -249,10 +563,26 @@ export default function WeekView(props: WeekViewProps) {
                   const segments = () => weekSchedule()[day].segments;
                   return (
                     <div
+                      ref={(element) => columnElements.set(day, element)}
                       class={`relative border-r border-base-200 ${dropHighlight() === day ? "bg-info/5 ring-2 ring-inset ring-info/40" : ""}`}
                       style={{ height: `${TIMELINE_HEIGHT}px` }}
                       role="gridcell"
                       aria-label={`${DAY_LABELS[day]} timeline, 00:00 to 24:00`}
+                      onClick={(event) => {
+                        if (event.target !== event.currentTarget || suppressClick) return;
+                        const start = Math.min(
+                          snapTimelineMinutes(minuteAt(event.clientY)),
+                          1380,
+                        );
+                        const occupied = blocks().some((block) =>
+                          spansOverlap({ start, end: Math.min(1440, start + 1) }, block),
+                        ) || segments().some((segment) =>
+                          spansOverlap({ start, end: Math.min(1440, start + 1) }, segment),
+                        );
+                        if (!occupied) {
+                          props.onOpenAddItem(day, "busy", start, Math.min(1440, start + 60));
+                        }
+                      }}
                       onDragOver={(event) => handleColumnDragOver(event, day)}
                       onDrop={(event) => handleColumnDrop(event, day)}
                       onDragLeave={() => {
@@ -266,6 +596,19 @@ export default function WeekView(props: WeekViewProps) {
                       </For>
                       <For each={blocks()}>{(block) => renderBlock(day, block)}</For>
                       <For each={segments()}>{(segment) => renderSegment(segment)}</For>
+                      <Show when={pointerPreview()?.day === day && !pointerPreview()?.refused}>
+                        <For each={splitTimelineSpan(pointerPreview()!.start, pointerPreview()!.end)}>
+                          {(span) => (
+                            <div
+                              class="pointer-events-none absolute inset-x-1 z-40 overflow-hidden rounded-md border-2 border-warning bg-warning/25 p-1 text-[10px] font-semibold text-warning-content shadow-md"
+                              style={timelineBlockStyle(span)}
+                              data-testid="timeline-preview"
+                            >
+                              Preview {minutesToTime(span.start)}–{minutesToTime(span.end)}
+                            </div>
+                          )}
+                        </For>
+                      </Show>
                       <Show when={blocks().length === 0 && segments().length === 0}>
                         <div class="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-base-content/25">No occupancy</div>
                       </Show>
