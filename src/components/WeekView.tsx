@@ -22,6 +22,7 @@ import {
   keyboardMoveRequest,
   keyboardResizeValue,
   isKeyboardResizeKey,
+  isTimelineMovePointerTarget,
   pointerMoveSpan,
   resolveKeyboardMove,
   resolveKeyboardResize,
@@ -598,7 +599,6 @@ export default function WeekView(props: WeekViewProps) {
                     : "border-dashed border-base-content/40 bg-base-content/10 text-base-content/75"
             } ${isInteractive(block) ? "cursor-pointer" : "cursor-default"} z-20`}
             style={timelineBlockStyle(span)}
-            draggable={block.source === "one-off"}
             classList={{
               "touch-none": block.source === "one-off",
               "select-none": draggingItemKey() === `${day}:${item?.id}`,
@@ -613,13 +613,6 @@ export default function WeekView(props: WeekViewProps) {
             data-keyboard-item={item ? `${day}:${item.id}` : undefined}
             data-keyboard-surface="timeline"
             tabIndex={isInteractive(block) ? 0 : undefined}
-            onDragStart={(event) => {
-              if (item) {
-                setDraggingItemKey(`${day}:${item.id}`);
-                beginDrag(event.dataTransfer, { kind: "day-item", item });
-              }
-            }}
-            onDragEnd={() => setDraggingItemKey(null)}
             onFocus={() => {
               const active = keyboardResize();
               if (!item || active?.day !== day || active.itemId !== item.id) {
@@ -627,7 +620,9 @@ export default function WeekView(props: WeekViewProps) {
               }
             }}
             onPointerDown={(event) => {
-              if (item) beginPointerInteraction(event, day, item, span);
+              if (item && isTimelineMovePointerTarget(event)) {
+                beginPointerInteraction(event, day, item, span);
+              }
             }}
             onClick={(event) => {
               event.stopPropagation();

@@ -19,6 +19,17 @@ import {
   snapTimelineMinutes,
 } from "./components/timeline";
 
+/** Whether a pointer down should start moving the timeline block. */
+export function isTimelineMovePointerTarget(
+  event: { target: unknown; currentTarget: unknown },
+): boolean {
+  if (event.target === event.currentTarget) return true;
+  const target = event.target as {
+    closest?: (selector: string) => unknown;
+  } | null;
+  return target?.closest?.("button") == null;
+}
+
 /** Calculate the requested wall-clock span for a grabbed pointer move. */
 export function pointerMoveSpan(
   item: DayItem,

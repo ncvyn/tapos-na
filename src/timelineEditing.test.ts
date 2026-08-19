@@ -3,6 +3,7 @@ import type { Day, Busy } from "./schema";
 import {
   keyboardMoveRequest,
   keyboardResizeValue,
+  isTimelineMovePointerTarget,
   resolveKeyboardMove,
   resolveKeyboardResize,
   resolvePointerMove,
@@ -27,6 +28,34 @@ const item: Busy = {
 };
 
 describe("pointer timeline editing seam", () => {
+  it("does not route nested controls into the block move handler", () => {
+    const block = { closest: () => null };
+    const text = { closest: () => null };
+    const deleteButton = {
+      closest: (selector: string) =>
+        selector === "button" ? deleteButton : null,
+    };
+
+    expect(
+      isTimelineMovePointerTarget({
+        target: block,
+        currentTarget: block,
+      }),
+    ).toBe(true);
+    expect(
+      isTimelineMovePointerTarget({
+        target: text,
+        currentTarget: block,
+      }),
+    ).toBe(true);
+    expect(
+      isTimelineMovePointerTarget({
+        target: deleteButton,
+        currentTarget: block,
+      }),
+    ).toBe(false);
+  });
+
   it("keeps the pointer grab offset while snapping a move", () => {
     expect(resolvePointerMove(createDay(), item, 700, 20)).toEqual({
       start: 675,
