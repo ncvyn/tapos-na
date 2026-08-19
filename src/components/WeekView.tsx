@@ -416,7 +416,14 @@ export default function WeekView(props: WeekViewProps) {
               <span>{sourceLabel(block.source)}</span>
               <span>{minutesToTime(span.start)}–{minutesToTime(span.end)}</span>
             </div>
-            <Show when={item && (item.start < item.end || span.end === item.end)}>
+            <Show
+              when={
+                item &&
+                (item.start < item.end ||
+                  span.end === item.end ||
+                  (item.start > item.end && item.end === 0 && span.end === 1440))
+              }
+            >
               <button
                 type="button"
                 class="absolute inset-x-0 bottom-0 z-30 h-2 cursor-ns-resize bg-transparent"
