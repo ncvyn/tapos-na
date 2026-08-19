@@ -31,7 +31,6 @@ import {
 } from "../timelineEditing";
 import { formatTimeSpan, getTodayWeekday, minutesToTime } from "../time";
 import { ITEM_ICONS, ITEM_THEMES, PRIORITY_BADGES } from "./itemStyles";
-import WeekStrip from "./WeekStrip";
 import {
   emptyTimelinePlacement,
   splitTimelineSpan,
@@ -778,14 +777,6 @@ export default function WeekView(props: WeekViewProps) {
 
   return (
     <div ref={keyboardRoot} class="space-y-6">
-      <WeekStrip
-        store={props.store}
-        onOpenEditItem={props.onOpenEditItem}
-        onOpenTemplate={props.onOpenTemplate}
-        onDropRefused={props.onDropRefused}
-        onPlacementNotice={props.onPlacementNotice}
-      />
-
       <section aria-labelledby="week-timeline-heading" class="space-y-3">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -812,17 +803,6 @@ export default function WeekView(props: WeekViewProps) {
             </span>
           </div>
         </div>
-        <Show when={pointerPreview()}>
-          {(preview) => (
-            <div
-              class={`rounded-md border px-3 py-2 text-xs ${preview().refused ? "border-error/40 bg-error/10 text-error" : preview().adjusted ? "border-warning/40 bg-warning/10 text-warning-content" : "border-info/40 bg-info/10 text-info-content"}`}
-              aria-live="polite"
-              data-testid="timeline-preview-status"
-            >
-              {preview().message}
-            </div>
-          )}
-        </Show>
         <Show when={keyboardResize()}>
           {(resize) => (
             <div
